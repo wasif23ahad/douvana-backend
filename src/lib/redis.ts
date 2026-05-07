@@ -1,28 +1,20 @@
-import Redis from 'ioredis';
+import { Redis } from 'ioredis';
+import dotenv from 'dotenv';
 
-const globalForRedis = globalThis as unknown as {
-  redis: Redis | undefined;
-  redisBullMQ: Redis | undefined;
-};
+dotenv.config();
 
-export const redis = globalForRedis.redis ?? new Redis(process.env.UPSTASH_REDIS_URL!, {
+const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
+
+export const redis = new Redis(redisUrl, {
   maxRetriesPerRequest: null,
-  enableReadyCheck: false,
 });
 
-export const redisBull = new Redis(process.env.UPSTASH_REDIS_URL!, {
-  maxRetriesPerRequest: null,
-  enableReadyCheck: false,
-});
-
-if (process.env.NODE_ENV !== 'production') {
-  globalForRedis.redis = redis;
-}
-
-redis.on('error', (err) => {
-  console.error('Redis connection error:', err.message);
+redis.on('error', (error) => {
+  console.error('Redis error:', error);
 });
 
 redis.on('connect', () => {
-  console.log('Connected to Upstash Redis');
+  console.log('Connected to Redis');
 });
+
+export default redis;

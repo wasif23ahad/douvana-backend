@@ -2,11 +2,13 @@ import { Router } from 'express';
 import authRoutes from './auth.routes.js';
 import templateRoutes from './template.routes.js';
 import applicationRoutes from './application.routes.js';
+import aiRoutes from './ai.routes.js';
 
 const router = Router();
 
 router.use('/auth', authRoutes);
 router.use('/templates', templateRoutes);
 router.use('/applications', applicationRoutes);
+router.use('/ai', aiRoutes);
 
 export default router;
