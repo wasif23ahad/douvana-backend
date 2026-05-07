@@ -1,8 +1,8 @@
 {
   "name": "drouvana-backend",
   "version": "1.0.0",
-  "description": "Drouvana API - AI-powered job application intelligence platform",
-  "main": "dist/server.js",
+  "type": "module",
+  "main": "dist/src/server.js",
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
@@ -19,7 +19,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@prisma/client": "^7.8.0",
+    "@prisma/client": "^6.2.1",
     "@types/bcryptjs": "^2.4.6",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
@@ -39,7 +39,7 @@
     "multer": "^2.1.1",
     "nodemon": "^3.1.14",
     "openai": "^6.37.0",
-    "prisma": "^7.8.0",
+    "prisma": "^6.2.1",
     "ts-node": "^10.9.2",
     "tsx": "^4.21.0",
     "typescript": "^6.0.3",
