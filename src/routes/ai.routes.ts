@@ -1,10 +1,11 @@
 import { Router } from 'express';
 import { 
-  analyzeJD, 
-  generateResume, 
-  getJobStatus, 
-  generateCoverLetter, 
-  calculateHealthScore 
+  parseJD,
+  analyzeResumeSSE,
+  generateCoverLetterSSE,
+  generateEmail,
+  chatSSE,
+  analyzePipelineHealth
 } from '../controllers/ai.controller.js';
 import { protect } from '../middleware/auth.middleware.js';
 
@@ -12,10 +13,22 @@ const router = Router();
 
 router.use(protect);
 
-router.post('/analyze-jd', analyzeJD);
-router.post('/generate-resume', generateResume);
-router.get('/jobs/:id', getJobStatus);
-router.post('/generate-cover-letter', generateCoverLetter);
-router.post('/health-score', calculateHealthScore);
+// Agent 1: JD Parser
+router.post('/parse-jd', parseJD);
+
+// Agent 2: ATS Analyzer (SSE)
+router.get('/analyze-resume/sse/:applicationId', analyzeResumeSSE);
+
+// Agent 3: Cover Letter (SSE)
+router.post('/generate-cover-letter/sse', generateCoverLetterSSE);
+
+// Agent 4: Email Draft
+router.post('/generate-email', generateEmail);
+
+// Agent 5: Career Coach (SSE)
+router.post('/chat/sse', chatSSE);
+
+// Agent 6: Pipeline Health
+router.get('/pipeline-health', analyzePipelineHealth);
 
 export default router;
