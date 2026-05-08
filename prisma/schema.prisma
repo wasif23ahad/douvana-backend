@@ -19,57 +19,6 @@ enum Role {
   ADMIN
 }
 
-enum JobType {
-  REMOTE
-  ONSITE
-  HYBRID
-}
-
-enum ApplicationStatus {
-  SAVED
-  APPLYING
-  APPLIED
-  SCREENING
-  INTERVIEW
-  OFFER
-  REJECTED
-  WITHDRAWN
-}
-
-enum Priority {
-  LOW
-  MEDIUM
-  HIGH
-}
-
-enum TemplateCategory {
-  TECH
-  CREATIVE
-  FINANCE
-  MARKETING
-  OPERATIONS
-  EXECUTIVE
-  GENERAL
-}
-
-enum TemplateStyle {
-  MODERN
-  CLASSIC
-  MINIMAL
-  BOLD
-}
-
-enum ActivityType {
-  STATUS_CHANGE
-  NOTE_ADDED
-  RESUME_GENERATED
-  COVER_LETTER_GENERATED
-  EMAIL_GENERATED
-  INTERVIEW_SCHEDULED
-  OFFER_RECEIVED
-  APPLICATION_CREATED
-}
-
 model User {
   id           String   @id @default(cuid())
   name         String?
@@ -87,6 +36,7 @@ model User {
   skills       String[]
   experience   Json?
   education    Json?
+  googleId     String?  @unique
   isActive     Boolean  @default(true)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
@@ -97,11 +47,16 @@ model User {
   resumes       Resume[]
   reviews       TemplateReview[]
   notifications Notification[]
+  masterResume  MasterResume?
+  resumeVersions ResumeVersion[]
+  coverLetters  CoverLetter[]
+  emailDrafts   EmailDraft[]
+  chatSessions  ChatSession[]
+  aiLogs        AILog[]
 
   @@index([email])
 }
 
-// NextAuth required models
 model Account {
   id                String  @id @default(cuid())
   userId            String
@@ -139,6 +94,23 @@ model VerificationToken {
 // ─────────────────────────────────────────────────
 // TEMPLATES (PUBLIC LISTING)
 // ─────────────────────────────────────────────────
+
+enum TemplateCategory {
+  TECH
+  CREATIVE
+  FINANCE
+  MARKETING
+  OPERATIONS
+  EXECUTIVE
+  GENERAL
+}
+
+enum TemplateStyle {
+  MODERN
+  CLASSIC
+  MINIMAL
+  BOLD
+}
 
 model Template {
   id            String           @id @default(cuid())
@@ -183,6 +155,32 @@ model TemplateReview {
 // APPLICATIONS (TRACKER)
 // ─────────────────────────────────────────────────
 
+enum Platform {
+  LINKEDIN
+  FACEBOOK
+  COMPANY_SITE
+  REFERRAL
+  GLASSDOOR
+  INDEED
+  OTHER
+}
+
+enum AppStatus {
+  SAVED
+  APPLIED
+  SCREENING
+  INTERVIEW
+  OFFER
+  REJECTED
+  WITHDRAWN
+}
+
+enum LocationType {
+  REMOTE
+  HYBRID
+  ONSITE
+}
+
 model Application {
   id             String            @id @default(cuid())
   userId         String
@@ -190,37 +188,90 @@ model Application {
   company        String
   companyLogo    String?
   location       String?
-  jobType        JobType?
+  locationType   LocationType      @default(ONSITE)
   salaryMin      Int?
   salaryMax      Int?
   currency       String            @default("USD")
-  status         ApplicationStatus @default(SAVED)
+  status         AppStatus         @default(SAVED)
+  platform       Platform          @default(OTHER)
   source         String?
   jobUrl         String?
   jobDescription String?           @db.Text
   appliedAt      DateTime?
   deadline       DateTime?
   notes          String?           @db.Text
-  priority       Priority          @default(MEDIUM)
+  priority       Int               @default(2) // 1: Low, 2: Medium, 3: High
   sortOrder      Int               @default(0)
+  parsedData     Json?             // AI-extracted: skills, keywords, etc.
+  deletedAt      DateTime?         // Soft delete
   createdAt      DateTime          @default(now())
   updatedAt      DateTime          @updatedAt
 
-  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  resume      Resume?
-  jdAnalysis  JDAnalysis?
-  healthScore HealthScore?
-  contacts    Contact[]
-  activities  Activity[]
+  user           User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  statusHistory  StatusHistory[]
+  activityLogs   ActivityLog[]
+  resumeVersions ResumeVersion[]
+  coverLetters   CoverLetter[]
+  emailDrafts    EmailDraft[]
+  
+  // Keep legacy relations for backward compatibility during transition
+  resume         Resume?
+  jdAnalysis     JDAnalysis?
+  healthScore    HealthScore?
+  contacts       Contact[]
+  activities     Activity[]
 
   @@index([userId, status])
   @@index([userId, createdAt])
+}
+
+model StatusHistory {
+  id            String      @id @default(cuid())
+  applicationId String
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  fromStatus    AppStatus?
+  toStatus      AppStatus
+  note          String?
+  changedAt     DateTime    @default(now())
+}
+
+model ActivityLog {
+  id            String      @id @default(cuid())
+  applicationId String
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  content       String
+  createdAt     DateTime    @default(now())
 }
 
 // ─────────────────────────────────────────────────
 // RESUMES
 // ─────────────────────────────────────────────────
 
+model MasterResume {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  data      Json     // Full structured resume data
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ResumeVersion {
+  id            String       @id @default(cuid())
+  userId        String
+  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  applicationId String?
+  application   Application? @relation(fields: [applicationId], references: [id])
+  name          String
+  data          Json
+  templateId    String       @default("classic")
+  atsScore      Int?
+  createdAt     DateTime     @default(now())
+
+  @@index([userId])
+}
+
+// Legacy Resume model
 model Resume {
   id            String   @id @default(cuid())
   userId        String
@@ -240,7 +291,90 @@ model Resume {
 }
 
 // ─────────────────────────────────────────────────
-// AI OUTPUTS
+// DOCUMENTS
+// ─────────────────────────────────────────────────
+
+model CoverLetter {
+  id            String       @id @default(cuid())
+  userId        String
+  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  applicationId String?
+  application   Application? @relation(fields: [applicationId], references: [id])
+  variant       String?
+  content       String       @db.Text
+  tone          String?
+  wordCount     Int?
+  keywordScore  Float?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+}
+
+enum EmailType {
+  COLD_OUTREACH
+  FOLLOW_UP
+  THANK_YOU
+  REFERRAL_REQUEST
+}
+
+model EmailDraft {
+  id            String       @id @default(cuid())
+  userId        String
+  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  applicationId String?
+  application   Application? @relation(fields: [applicationId], references: [id])
+  emailType     EmailType
+  subject       String
+  body          String       @db.Text
+  createdAt     DateTime     @default(now())
+}
+
+// ─────────────────────────────────────────────────
+// AI ASSISTANT & LOGGING
+// ─────────────────────────────────────────────────
+
+enum ChatRole {
+  USER
+  ASSISTANT
+}
+
+model ChatSession {
+  id        String        @id @default(cuid())
+  userId    String
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages  ChatMessage[]
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+}
+
+model ChatMessage {
+  id        String      @id @default(cuid())
+  sessionId String
+  session   ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  role      ChatRole
+  content   String      @db.Text
+  createdAt DateTime    @default(now())
+}
+
+model AILog {
+  id           String   @id @default(cuid())
+  userId       String?
+  user         User?    @relation(fields: [userId], references: [id])
+  feature      String
+  inputTokens  Int      @default(0)
+  outputTokens Int      @default(0)
+  latencyMs    Int      @default(0)
+  success      Boolean  @default(true)
+  errorMsg     String?
+  cacheHit     Boolean  @default(false)
+  createdAt    DateTime @default(now())
+
+  @@index([userId])
+  @@index([feature])
+  @@index([createdAt])
+}
+
+// ─────────────────────────────────────────────────
+// LEGACY AI OUTPUTS
 // ─────────────────────────────────────────────────
 
 model JDAnalysis {
@@ -276,13 +410,13 @@ model HealthScore {
 }
 
 // ─────────────────────────────────────────────────
-// ACTIVITY TIMELINE
+// MISC
 // ─────────────────────────────────────────────────
 
 model Activity {
   id            String       @id @default(cuid())
   applicationId String
-  type          ActivityType
+  type          String // ActivityType as string for flexibility during transition
   description   String
   metadata      Json?
   createdAt     DateTime     @default(now())
@@ -291,10 +425,6 @@ model Activity {
 
   @@index([applicationId, createdAt])
 }
-
-// ─────────────────────────────────────────────────
-// CONTACTS
-// ─────────────────────────────────────────────────
 
 model Contact {
   id            String   @id @default(cuid())
@@ -308,10 +438,6 @@ model Contact {
 
   application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
 }
-
-// ─────────────────────────────────────────────────
-// NOTIFICATIONS
-// ─────────────────────────────────────────────────
 
 model Notification {
   id        String   @id @default(cuid())
@@ -327,10 +453,6 @@ model Notification {
 
   @@index([userId, read])
 }
-
-// ─────────────────────────────────────────────────
-// BLOG
-// ─────────────────────────────────────────────────
 
 model Blog {
   id          String    @id @default(cuid())
@@ -349,10 +471,6 @@ model Blog {
 
   @@index([published, publishedAt])
 }
-
-// ─────────────────────────────────────────────────
-// NEWSLETTER
-// ─────────────────────────────────────────────────
 
 model Newsletter {
   id        String   @id @default(cuid())

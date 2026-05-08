@@ -1,137 +1,230 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
-import dotenv from 'dotenv';
+import { prisma } from '../lib/prisma.js';
 import logger from '../lib/logger.js';
-
-dotenv.config();
-
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
-const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+import { prompts, buildATSAnalyzerPrompt, buildCoverLetterPrompt } from './aiPrompts.js';
+import { callAI, streamAI } from '../config/aiClient.js';
+import { Response } from 'express';
 
 export class AIService {
   /**
-   * Analyze a Job Description
+   * Agent 1: JD Parser
+   * Extracts structured data from raw job descriptions.
    */
-  async analyzeJD(jd: string) {
+  async parseJD(jd: string, userId?: string) {
+    const startTime = Date.now();
     try {
-      const prompt = `
-        Analyze the following Job Description and extract key insights in JSON format.
-        Return the following structure:
-        {
-          "requiredSkills": ["skill1", "skill2"],
-          "niceToHave": ["skill1", "skill2"],
-          "experienceLevel": "Junior/Mid/Senior",
-          "atsKeywords": ["keyword1", "keyword2"],
-          "cultureSignals": ["value1", "value2"],
-          "redFlags": ["flag1"],
-          "companySummary": "brief summary",
-          "roleInsights": "what this role actually focuses on"
-        }
+      const response = await callAI({
+        system: prompts.JD_PARSER_SYSTEM,
+        messages: [{ role: 'user', content: jd }],
+        temperature: 0.1,
+        jsonMode: true,
+      });
 
-        Job Description:
-        ${jd}
-      `;
-
-      const result = await model.generateContent(prompt);
-      const response = await result.response;
-      const text = response.text();
+      const parsedData = JSON.parse(response || '{}');
       
-      // Clean potential markdown code blocks
-      const jsonStr = text.replace(/```json|```/g, '').trim();
-      return JSON.parse(jsonStr);
-    } catch (error) {
-      logger.error('AI analyzeJD Error:', error);
+      await this.logAIUsage({
+        userId,
+        feature: 'JD_PARSER',
+        latencyMs: Date.now() - startTime,
+        success: true,
+      });
+
+      return parsedData;
+    } catch (error: any) {
+      logger.error('JD Parser Agent Error:', error.message);
+      await this.logAIUsage({
+        userId,
+        feature: 'JD_PARSER',
+        latencyMs: Date.now() - startTime,
+        success: false,
+        errorMsg: error.message,
+      });
       throw error;
     }
   }
 
   /**
-   * Generate Resume Content based on JD and User Profile
+   * Agent 2: ATS Analyzer (Streaming)
    */
-  async generateResume(userData: any, jdAnalysis: any) {
+  async analyzeResumeSSE(resumeData: any, jobDescription: string, res: Response, userId: string) {
+    const startTime = Date.now();
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+
     try {
-      const prompt = `
-        Create a professional, high-impact resume content tailored for this specific job.
-        Targeting: ${jdAnalysis.roleInsights}
-        Required Skills: ${jdAnalysis.requiredSkills.join(', ')}
+      const prompt = buildATSAnalyzerPrompt(resumeData, jobDescription);
+      const stream = await streamAI({
+        system: prompts.ATS_ANALYZER_SYSTEM,
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.3,
+      });
 
-        User Experience:
-        ${JSON.stringify(userData.experience)}
+      let fullContent = '';
+      for await (const chunk of stream) {
+        const content = chunk.choices[0]?.delta?.content || '';
+        fullContent += content;
+        res.write(`data: ${JSON.stringify({ type: 'delta', content })}\n\n`);
+      }
 
-        Return a JSON object matching this structure:
-        {
-          "summary": "Impactful professional summary",
-          "experience": [
-            {
-              "role": "title",
-              "company": "name",
-              "duration": "dates",
-              "achievements": ["bullet1 with metrics", "bullet2"]
-            }
-          ],
-          "skills": ["tailored skill list"]
-        }
-      `;
+      res.write(`data: ${JSON.stringify({ type: 'complete', fullContent })}\n\n`);
+      res.end();
 
-      const result = await model.generateContent(prompt);
-      const response = await result.response;
-      const text = response.text();
-      const jsonStr = text.replace(/```json|```/g, '').trim();
-      return JSON.parse(jsonStr);
-    } catch (error) {
-      logger.error('AI generateResume Error:', error);
+      await this.logAIUsage({
+        userId,
+        feature: 'ATS_ANALYZER',
+        latencyMs: Date.now() - startTime,
+        success: true,
+      });
+    } catch (error: any) {
+      logger.error('ATS Analyzer Agent Error:', error.message);
+      res.write(`data: ${JSON.stringify({ type: 'error', message: error.message })}\n\n`);
+      res.end();
+    }
+  }
+
+  /**
+   * Agent 3: Cover Letter (Streaming)
+   */
+  async generateCoverLetterSSE(params: any, res: Response, userId: string) {
+    const startTime = Date.now();
+    res.setHeader('Content-Type', 'text/event-stream');
+    
+    try {
+      const prompt = buildCoverLetterPrompt(params);
+      const stream = await streamAI({
+        system: prompts.COVER_LETTER_SYSTEM,
+        messages: [{ role: 'user', content: prompt }],
+      });
+
+      let fullContent = '';
+      for await (const chunk of stream) {
+        const content = chunk.choices[0]?.delta?.content || '';
+        fullContent += content;
+        res.write(`data: ${JSON.stringify({ type: 'delta', content })}\n\n`);
+      }
+
+      res.write(`data: ${JSON.stringify({ type: 'complete', fullContent })}\n\n`);
+      res.end();
+
+      await this.logAIUsage({
+        userId,
+        feature: 'COVER_LETTER',
+        latencyMs: Date.now() - startTime,
+        success: true,
+      });
+    } catch (error: any) {
+      logger.error('Cover Letter Agent Error:', error.message);
+      res.write(`data: ${JSON.stringify({ type: 'error', message: error.message })}\n\n`);
+      res.end();
+    }
+  }
+
+  /**
+   * Agent 4: Email Drafting
+   */
+  async generateEmail(params: any, userId: string) {
+    const startTime = Date.now();
+    try {
+      const response = await callAI({
+        system: prompts.EMAIL_SYSTEM,
+        messages: [{ role: 'user', content: JSON.stringify(params) }],
+        jsonMode: true,
+      });
+
+      const emailData = JSON.parse(response || '{}');
+      await this.logAIUsage({
+        userId,
+        feature: 'EMAIL_DRAFT',
+        latencyMs: Date.now() - startTime,
+        success: true,
+      });
+      return emailData;
+    } catch (error: any) {
+      logger.error('Email Agent Error:', error.message);
       throw error;
     }
   }
 
   /**
-   * Generate Cover Letter (Streaming Support)
+   * Agent 5: Career Coach (Multi-turn)
    */
-  async generateCoverLetterStream(userData: any, applicationData: any) {
-    try {
-      const prompt = `
-        Write a compelling, professional cover letter for ${userData.name} applying for the ${applicationData.jobTitle} position at ${applicationData.company}.
-        Focus on these key skills: ${applicationData.jdAnalysis?.requiredSkills?.join(', ') || 'relevance'}.
-        Keep it concise, bold, and personalized.
-      `;
+  async chatSSE(history: any[], context: any, res: Response, userId: string) {
+    const startTime = Date.now();
+    res.setHeader('Content-Type', 'text/event-stream');
 
-      const result = await model.generateContentStream(prompt);
-      return result.stream;
-    } catch (error) {
-      logger.error('AI generateCoverLetter Error:', error);
+    try {
+      const systemPrompt = prompts.CHAT_SYSTEM(context);
+      const stream = await streamAI({
+        system: systemPrompt,
+        messages: history,
+      });
+
+      for await (const chunk of stream) {
+        const content = chunk.choices[0]?.delta?.content || '';
+        res.write(`data: ${JSON.stringify({ type: 'delta', content })}\n\n`);
+      }
+
+      res.end();
+      await this.logAIUsage({
+        userId,
+        feature: 'CAREER_COACH',
+        latencyMs: Date.now() - startTime,
+        success: true,
+      });
+    } catch (error: any) {
+      logger.error('Career Coach Agent Error:', error.message);
+      res.end();
+    }
+  }
+
+  /**
+   * Agent 6: Pipeline Health
+   */
+  async analyzePipelineHealth(stats: any, userId: string) {
+    const startTime = Date.now();
+    try {
+      const response = await callAI({
+        system: prompts.PIPELINE_HEALTH_SYSTEM,
+        messages: [{ role: 'user', content: JSON.stringify(stats) }],
+        jsonMode: true,
+      });
+
+      const healthData = JSON.parse(response || '{}');
+      await this.logAIUsage({
+        userId,
+        feature: 'PIPELINE_HEALTH',
+        latencyMs: Date.now() - startTime,
+        success: true,
+      });
+      return healthData;
+    } catch (error: any) {
+      logger.error('Pipeline Health Agent Error:', error.message);
       throw error;
     }
   }
 
   /**
-   * Calculate Health Score / Match Percentage
+   * Helper: Log AI usage to database
    */
-  async calculateHealthScore(resumeContent: any, jdAnalysis: any) {
+  private async logAIUsage(params: {
+    userId?: string;
+    feature: string;
+    latencyMs: number;
+    success: boolean;
+    errorMsg?: string;
+  }) {
     try {
-      const prompt = `
-        Compare the following resume content with the job requirements and calculate a match score.
-        
-        Resume: ${JSON.stringify(resumeContent)}
-        Requirements: ${JSON.stringify(jdAnalysis)}
-
-        Return a JSON:
-        {
-          "overallScore": 0-100,
-          "atsProbability": 0-100,
-          "keywordMatchScore": 0-100,
-          "missingSkills": ["skill1"],
-          "strengths": ["point1"],
-          "recommendations": ["advice1"]
-        }
-      `;
-
-      const result = await model.generateContent(prompt);
-      const response = await result.response;
-      const text = response.text();
-      const jsonStr = text.replace(/```json|```/g, '').trim();
-      return JSON.parse(jsonStr);
+      await prisma.aILog.create({
+        data: {
+          userId: params.userId,
+          feature: params.feature,
+          latencyMs: params.latencyMs,
+          success: params.success,
+          errorMsg: params.errorMsg,
+        },
+      });
     } catch (error) {
-      logger.error('AI calculateHealthScore Error:', error);
-      throw error;
+      logger.error('Failed to log AI usage to DB:', error);
     }
   }
 }
