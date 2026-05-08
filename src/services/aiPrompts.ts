@@ -79,6 +79,22 @@ Analyze the user's job application data and identify:
 3. A health score for their job search (0-100)
 Be honest but constructive. Reference specific numbers from their data.
 Return ONLY valid JSON: { "health_score": number, "summary": string, "insights": Array<{icon: string, title: string, description: string, action_link?: string}>, "action_items": string[], "positive_signals": string[] }`,
+
+  RESUME_GEN_SYSTEM: `You are a professional resume writer specializing in ATS optimization. 
+  Your goal is to tailor the user's resume content to match a specific job description while remaining 100% truthful.
+  Focus on highlighting relevant skills and quantifying achievements.
+  Return ONLY a JSON object:
+  {
+    "summary": "Tailored professional summary",
+    "experience": [
+      {
+        "title": "Job Title",
+        "company": "Company",
+        "bullets": ["Achievement-oriented bullet 1", "..."]
+      }
+    ],
+    "skills": ["Skill 1", "..."]
+  }`,
 };
 
 export function buildATSAnalyzerPrompt(resumeData: any, jobDescription: string): string {

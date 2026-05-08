@@ -178,6 +178,45 @@ export class AIService {
   }
 
   /**
+   * Agent: Resume Generation
+   * Tailors a resume based on JD and master resume
+   */
+  async generateResume(user: any, jdAnalysis: any) {
+    const startTime = Date.now();
+    try {
+      const prompt = `
+        JOB TITLE: ${jdAnalysis.roleInsights || 'Target Role'}
+        REQUIRED SKILLS: ${jdAnalysis.requiredSkills?.join(', ')}
+        KEY ARCHITECTURAL/TECH FOCUS: ${jdAnalysis.atsKeywords?.join(', ')}
+        
+        USER PROFILE:
+        ${JSON.stringify(user)}
+      `;
+
+      const response = await callAI({
+        system: prompts.RESUME_GEN_SYSTEM,
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.5,
+        jsonMode: true,
+      });
+
+      const resumeContent = JSON.parse(response || '{}');
+      
+      await this.logAIUsage({
+        userId: user.id,
+        feature: 'RESUME_GEN',
+        latencyMs: Date.now() - startTime,
+        success: true,
+      });
+
+      return resumeContent;
+    } catch (error: any) {
+      logger.error('Resume Generation Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
    * Agent 6: Pipeline Health
    */
   async analyzePipelineHealth(stats: any, userId: string) {
