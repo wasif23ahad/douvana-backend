@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { aiService } from '../services/ai.service.js';
 import { prisma } from '../lib/prisma.js';
 import logger from '../lib/logger.js';
+import { redis } from '../lib/redis.js';
 
 /**
  * @desc    Agent 1: Analyze Job Description (Non-streaming)
@@ -131,12 +132,13 @@ export const generateEmail = async (req: Request, res: Response, next: NextFunct
  */
 export const chatSSE = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { message, history } = req.body;
+    // Accept both formats: new { history, context } and legacy { message, history }
+    const { history = [], context: clientContext } = req.body;
     const userId = req.user?.id;
 
     if (!userId) return res.status(401).json({ success: false, message: 'Unauthorized' });
 
-    // 1. Fetch user context for the coach
+    // Fetch server-side user context (authoritative)
     const [totalApps, stats, recentApps, masterResume] = await Promise.all([
       prisma.application.count({ where: { userId } }),
       prisma.application.groupBy({
@@ -153,19 +155,24 @@ export const chatSSE = async (req: Request, res: Response, next: NextFunction) =
       prisma.masterResume.findUnique({ where: { userId } })
     ]);
 
-    const context = {
+    const serverContext = {
       totalApplications: totalApps,
       statusBreakdown: stats.reduce((acc: any, s: any) => ({ ...acc, [s.status]: s._count }), {}),
-      activeCount: stats.filter((s: any) => s.status !== 'REJECTED' && s.status !== 'WITHDRAWN').reduce((acc: any, s: any) => acc + s._count, 0),
-      responseRate: 20, // TODO: Calculate actual rate
+      activeCount: stats
+        .filter((s: any) => !['REJECTED', 'WITHDRAWN'].includes(s.status))
+        .reduce((acc: any, s: any) => acc + s._count, 0),
+      responseRate: totalApps > 0
+        ? Math.round((stats.filter((s: any) => ['INTERVIEW', 'OFFER'].includes(s.status)).reduce((a: any, s: any) => a + s._count, 0) / totalApps) * 100)
+        : 0,
       skills: (masterResume?.data as any)?.skills || [],
-      experienceLevel: 'Mid-level', // TODO: Extract from resume
+      experienceLevel: 'Mid-level',
       recentApplications: recentApps.map((a: any) => ({ jobTitle: a.jobTitle, companyName: a.company, status: a.status }))
     };
 
-    // 2. Start streaming
-    const fullHistory = [...history, { role: 'user', content: message }];
-    await aiService.chatSSE(fullHistory, context, res, userId);
+    // Merge client-provided context (non-sensitive info like draft messages) with server context
+    const context = { ...clientContext, ...serverContext };
+
+    await aiService.chatSSE(history, context, res, userId);
   } catch (error) {
     next(error);
   }
@@ -180,6 +187,14 @@ export const analyzePipelineHealth = async (req: Request, res: Response, next: N
     const userId = req.user?.id;
     if (!userId) return res.status(401).json({ success: false, message: 'Unauthorized' });
 
+    // Check Redis cache first (6-hour TTL)
+    const cacheKey = `pipeline_health:${userId}:${new Date().toDateString()}`;
+    const cached = await redis.get(cacheKey);
+    if (cached) {
+      logger.info(`Cache hit: pipeline health for user ${userId}`);
+      return res.json({ success: true, data: JSON.parse(cached), cached: true });
+    }
+
     // Aggregate stats for health check
     const apps = await prisma.application.findMany({ where: { userId } });
     const stats = {
@@ -188,10 +203,19 @@ export const analyzePipelineHealth = async (req: Request, res: Response, next: N
         acc[a.status] = (acc[a.status] || 0) + 1;
         return acc;
       }, {}),
-      // Add more stats as needed
+      responseRate: apps.length > 0
+        ? Math.round((apps.filter((a: any) => ['INTERVIEW', 'OFFER'].includes(a.status)).length / apps.length) * 100)
+        : 0,
+      daysSinceLastApplication: apps.length > 0
+        ? Math.floor((Date.now() - new Date(apps.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0].createdAt).getTime()) / (1000 * 60 * 60 * 24))
+        : null,
     };
 
     const healthData = await aiService.analyzePipelineHealth(stats, userId);
+
+    // Cache result for 6 hours
+    await redis.setex(cacheKey, 6 * 60 * 60, JSON.stringify(healthData));
+
     res.json({ success: true, data: healthData });
   } catch (error) {
     next(error);
