@@ -44,6 +44,11 @@ app.get('/health', (req, res) => {
   res.status(200).json({ status: 'OK', message: 'Drouvana Backend is running' });
 });
 
+// Root Route
+app.get('/', (req, res) => {
+  res.status(200).json({ status: 'OK', message: 'Drouvana API API Service' });
+});
+
 // Routes
 app.use('/api', routes);
 
