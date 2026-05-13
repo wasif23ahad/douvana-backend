@@ -100,3 +100,50 @@ export const getMe = async (req: Request, res: Response, next: NextFunction) => 
     next(error);
   }
 };
+
+export const googleLogin = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { email, name, googleId, avatar } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ message: 'Email is required for Google Login' });
+    }
+
+    let user = await prisma.user.findUnique({ where: { email } });
+
+    if (user) {
+      // User exists, update googleId and avatar if not present
+      if (!user.googleId || !user.avatar) {
+        user = await prisma.user.update({
+          where: { email },
+          data: {
+            googleId: user.googleId || googleId,
+            avatar: user.avatar || avatar,
+          },
+        });
+      }
+    } else {
+      // Create new user
+      user = await prisma.user.create({
+        data: {
+          email,
+          name,
+          googleId,
+          avatar,
+        },
+      });
+    }
+
+    res.json({
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      avatar: user.avatar,
+      token: generateToken(user.id),
+      refreshToken: generateRefreshToken(user.id),
+    });
+  } catch (error) {
+    next(error);
+  }
+};
