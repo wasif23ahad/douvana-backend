@@ -110,7 +110,12 @@ export async function callAI(params: {
         });
       }
 
-      return JSON.stringify({ success: true, status: "simulated" });
+      // If requested payload expects a JSON string, fallback gracefully. Otherwise serve normal guideline text.
+      const isJsonRequested = sys.includes('JSON') || sys.includes('schema') || sys.includes('{');
+      if (isJsonRequested) {
+        return JSON.stringify({ success: true, status: "simulated" });
+      }
+      return "As your dedicated Drouvana Career Coach, I provide end-to-end guidance tailored to your specific technical and professional roadmap. Outline your interview preparation targets, target job descriptions, or networking goals below to get started.";
     }
   }
 }
@@ -218,12 +223,26 @@ export async function* streamAI(params: {
         return;
       }
 
-      // Default real-time Chat streaming simulation chunking
-      const mockResponse = "Here is a targeted strategic plan to tailor your application profile and boost your target response conversion:\n\n### 1. Vector Keyword Alignment\nInject exact noun signatures and primary architectural concepts from the target job post directly into your Professional Summary and Core Competencies sections.\n\n### 2. Quantify Your Impact\nTransform basic functional summaries into concrete metric-driven outcomes.\n• **Original:** \"Optimized database performance.\"\n• **Tailored:** \"Architected connection pooling and query indexing strategies in PostgreSQL, reducing p99 API latencies by 42% under heavy concurrency load.\"\n\n### 3. Emphasize Core Infrastructure\nHighlight robust engineering implementations including memory-mapped Redis layers, JWT interception patterns, real-time Server-Sent Event (SSE) integrations, and reliable containerized delivery loops.\n\nWould you like me to tailor a specific experience bullet point or generate an optimized outreach email template for your target application role?";
+      // Intelligent Content-Aware Generative Career Expert Rules
+      const lastUserMsgText = params.messages[params.messages.length - 1]?.content?.toLowerCase() || '';
+      let mockResponse = "";
+
+      if (lastUserMsgText.includes('resume') || lastUserMsgText.includes('tailor') || lastUserMsgText.includes('cv')) {
+        mockResponse = "Here is a structured architectural approach to tailor your resume and optimize your ATS extraction scoring for modern applicant workflows:\n\n### 1. Vector Keyword Alignment\nInject exact noun signatures, frameworks, and domain verbs from the target Job Description directly into your Professional Summary and Core Competencies sections.\n\n### 2. Quantify Your Engineering Impact\nTransform basic functional descriptions into concrete, metric-driven achievements using strong action verbs.\n• **Formula:** Implemented [X] to resolve [Y], resulting in [Z].\n• **Example:** \"Redesigned connection pooling layers and caching strategies in Node.js, supporting 15,000+ concurrent user sessions and reducing p99 database latencies by 38%.\"\n\n### 3. Clear Structural Formatting\nAvoid complex multi-column layouts or graphic bars that cause automated parsers to drop token sequences. Use standard chronological ordering with clear bold headers.\n\nWould you like me to rewrite a specific experience bullet point to quantify its impact for your target application?";
+      } else if (lastUserMsgText.includes('interview') || lastUserMsgText.includes('prep') || lastUserMsgText.includes('question') || lastUserMsgText.includes('ask') || lastUserMsgText.includes('weakness')) {
+        mockResponse = "To confidently ace your target interviews, utilize the **STAR Method** (Situation, Task, Action, Result) to structure your behavioral and technical answers logically:\n\n### 1. Situation & Task\nSet the technical context concisely. Briefly outline the application complexity, scale constraints, or impending product deadlines your engineering team faced.\n\n### 2. Action (Your Direct Contribution)\nFocus heavily on what **you** architected. Detail your specific implementations, such as JWT middleware interception, distributed state synchronization, or database indexing optimizations.\n\n### 3. Result (Quantified Business Impact)\nConclude with the clear positive outcome. Emphasize speed gains, memory footprint reduction, or higher user retention metrics.\n\n**Common Screening Prompts to Prepare:**\n• \"Describe a time you resolved a critical production deployment failure under high pressure.\"\n• \"How do you handle changing system requirements when collaborating with cross-functional product stakeholders?\"";
+      } else if (lastUserMsgText.includes('technical') || lastUserMsgText.includes('code') || lastUserMsgText.includes('node') || lastUserMsgText.includes('react') || lastUserMsgText.includes('sql') || lastUserMsgText.includes('architecture')) {
+        mockResponse = "When addressing system design and technical coding questions during technical screens, follow a rigorous, methodical engineering framework:\n\n### 1. Clarify Core Assumptions\nBefore writing code or defining components, clearly establish expected payloads, target read/write ratios, and concurrency scaling expectations.\n\n### 2. Evaluate Architectural Trade-offs\nCompare competing patterns transparently. For example, contrast **Server-Sent Events (SSE)** against WebSockets based on unidirectional server broadcast requirements versus bidirectional frame transmission.\n\n### 3. Proactively Address Scalability\nDemonstrate senior awareness by detailing connection limits, memory-mapped caching frameworks like Redis, container orchestration boundaries, and unified exception boundaries.\n\nWhat specific concept or system design pattern would you like to review in depth?";
+      } else if (lastUserMsgText.includes('email') || lastUserMsgText.includes('linkedin') || lastUserMsgText.includes('follow') || lastUserMsgText.includes('message') || lastUserMsgText.includes('recruiter')) {
+        mockResponse = "Professional outreach strategies yield the highest conversion when they are concise, value-driven, and highly personalized. Here is an optimized template sequence:\n\n### 1. The Value Hook\nOpen immediately with your core domain signature rather than generic greetings. Recruiters review hundreds of profiles daily.\n\n### 2. Core Outreach Template\n\"Hi [Name],\n\nI recently submitted my application for the [Role] position and wanted to reach out directly. With focused expertise scaling high-concurrency Node.js backends and optimizing PostgreSQL delivery layers, I am confident in my ability to drive immediate impact for your engineering roadmap.\n\nI would welcome the opportunity to briefly connect.\"\n\n### 3. Follow-up Cadence\nSpace follow-ups at 4-day and 10-day intervals. Always introduce a new technical milestone or updated portfolio feature to maintain high engagement value.";
+      } else {
+        mockResponse = "As your dedicated Drouvana Career Coach, I am fully equipped to guide you through every critical milestone of your career building trajectory.\n\nWhether you need custom guidelines on structuring behavioral interview answers, evaluating core system architectures, optimizing ATS keyword extraction density, or composing high-converting outreach sequences to engineering managers, simply outline your current job search objective.\n\n**Recommended Next Steps:**\n• Share a target job description link or text.\n• Paste a specific resume bullet point you want quantified.\n• Ask for tailored preparation guidance on behavioral screening patterns.";
+      }
+
       const chunks = mockResponse.split(' ');
       for (const word of chunks) {
         yield { choices: [{ delta: { content: word + ' ' } }] } as any;
-        await new Promise(r => setTimeout(r, 15));
+        await new Promise(r => setTimeout(r, 12));
       }
     }
   }
