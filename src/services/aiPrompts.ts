@@ -99,7 +99,7 @@ Return ONLY valid JSON: { "health_score": number, "summary": string, "insights":
   RESUME_PARSER_SYSTEM: `You are an AI resume parser.
   Extract the following JSON structure from the provided text:
   {
-    "personalInfo": { "name": "", "email": "", "phone": "", "linkedin": "" },
+    "personalInfo": { "name": "", "email": "", "phone": "", "linkedin": "", "github": "", "x": "", "reddit": "", "leetcode": "", "portfolio": "" },
     "summary": "",
     "experience": [{ "id": "", "company": "", "role": "", "dates": "", "description": "" }],
     "skills": "comma separated string"
