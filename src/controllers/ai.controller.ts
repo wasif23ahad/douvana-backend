@@ -255,7 +255,7 @@ export const parseResumePDF = async (req: Request, res: Response, next: NextFunc
       parsedResume.personalInfo.name.includes("Candidate") || 
       parsedResume.personalInfo.name.includes("Rivera");
 
-    if (isSimulated && extractedRawText && extractedRawText.trim().length > 20) {
+    if (isSimulated && extractedRawText && extractedRawText.trim().length > 10) {
       // Heuristically extract authentic profile intelligence directly from actual candidate resume text stream
       const cleanLines = extractedRawText
         .split('\n')
@@ -270,36 +270,34 @@ export const parseResumePDF = async (req: Request, res: Response, next: NextFunc
           break;
         }
       }
-      if (!candidateName) candidateName = cleanLines[0] || "Professional Candidate";
+      if (!candidateName) candidateName = cleanLines[0] || "";
 
       // 2. Email Extraction
       const emailMatch = extractedRawText.match(/([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9_-]+)/i);
-      const candidateEmail = emailMatch ? emailMatch[1] : req.user?.email || "candidate@example.com";
+      const candidateEmail = emailMatch ? emailMatch[1] : req.user?.email || "";
 
-      // 3. Phone Extraction
-      const phoneMatch = extractedRawText.match(/(\+?\d[\d -]{8,15}\d)/);
-      const candidatePhone = phoneMatch ? phoneMatch[1] : "+1 (555) 019-2834";
+      // 3. Phone Extraction supporting Bangladeshi (+880/01) and international formats
+      const bdPhoneMatch = extractedRawText.match(/(\+?880[\d -]{8,12}|01[3-9][\d -]{8,10}|\+?\d[\d ()-]{8,16}\d)/);
+      const candidatePhone = bdPhoneMatch ? bdPhoneMatch[1].trim() : "";
 
-      // 4. URL/Social Extraction
+      // 4. URL/Social Extraction adhering strictly to Rule: unparsed fields must remain empty strings
       const linkedinMatch = extractedRawText.match(/(linkedin\.com\/in\/[a-zA-Z0-9_-]+)/i);
-      const candidateLinkedin = linkedinMatch ? linkedinMatch[1] : `linkedin.com/in/${candidateName.toLowerCase().replace(/\s+/g, '')}`;
+      const candidateLinkedin = linkedinMatch ? linkedinMatch[1] : "";
 
       const githubMatch = extractedRawText.match(/(github\.com\/[a-zA-Z0-9_-]+)/i);
-      const candidateGithub = githubMatch ? githubMatch[1] : `github.com/${candidateName.toLowerCase().replace(/\s+/g, '')}`;
+      const candidateGithub = githubMatch ? githubMatch[1] : "";
 
       // 5. Narrative/Summary Extraction
-      const contentExcerpt = cleanLines.slice(1, 12).join(' ');
-      const candidateSummary = contentExcerpt.length > 30 
-        ? contentExcerpt.slice(0, 380) + (contentExcerpt.length > 380 ? "..." : "")
-        : "Highly focused engineering professional with specialized expertise extracted directly from provided resume documentation.";
+      const contentExcerpt = cleanLines.slice(1, 10).join(' ');
+      const candidateSummary = contentExcerpt.length > 15 ? contentExcerpt.slice(0, 400) : "";
 
       // 6. Experience Context Extraction
-      const expSectionExcerpt = cleanLines.slice(3, 22).join('\n').slice(0, 600);
+      const expSectionExcerpt = cleanLines.slice(3, 20).join('\n').slice(0, 500);
 
       // 7. Core Skills Extraction
       const commonTechs = ["JavaScript", "TypeScript", "React", "Node.js", "Express", "PostgreSQL", "MongoDB", "Docker", "AWS", "Python", "Java", "C++", "SQL", "Git", "Next.js", "HTML", "CSS", "Tailwind", "Linux", "Kubernetes", "Redis", "REST APIs"];
       const foundTechs = commonTechs.filter(t => new RegExp(`\\b${t.replace(/\+/g, '\\+')}\\b`, 'i').test(extractedRawText));
-      const candidateSkills = foundTechs.length > 0 ? foundTechs.join(', ') : "JavaScript, TypeScript, React, Node.js, SQL, Git";
+      const candidateSkills = foundTechs.length > 0 ? foundTechs.join(', ') : "";
 
       parsedResume = {
         personalInfo: {
@@ -308,45 +306,45 @@ export const parseResumePDF = async (req: Request, res: Response, next: NextFunc
           phone: candidatePhone,
           linkedin: candidateLinkedin,
           github: candidateGithub,
-          portfolio: `https://${candidateName.toLowerCase().replace(/\s+/g, '')}.dev`,
-          x: `x.com/${candidateName.toLowerCase().replace(/\s+/g, '')}`,
-          reddit: `reddit.com/user/${candidateName.toLowerCase().replace(/\s+/g, '')}`,
-          leetcode: `leetcode.com/u/${candidateName.toLowerCase().replace(/\s+/g, '')}`
+          portfolio: "",
+          x: "",
+          reddit: "",
+          leetcode: ""
         },
         summary: candidateSummary,
         experience: [
           {
             id: "exp_extracted_real",
-            company: "Candidate Experience / Previous Roles",
-            role: "Professional Consultant",
-            dates: "Recent - Present",
-            description: expSectionExcerpt.length > 20 ? expSectionExcerpt : "• Executed primary technical requirements successfully.\n• Maintained highly resilient feature integration loops."
+            company: "",
+            role: "",
+            dates: "",
+            description: expSectionExcerpt.length > 15 ? expSectionExcerpt : ""
           }
         ],
         skills: candidateSkills
       };
     } else if (!parsedResume || !parsedResume.personalInfo || !parsedResume.personalInfo.name) {
-      // Ultimate absolute fallback structure
+      // Ultimate absolute fallback structure adhering strictly to Rule: no generative mock insertion
       parsedResume = {
         personalInfo: {
-          name: (req.user as any)?.name || "Alex Rivera",
-          email: req.user?.email || "alex.rivera@example.com",
-          phone: "+1 (555) 019-2834",
-          linkedin: "linkedin.com/in/alexrivera",
-          github: "github.com/alexrivera",
-          portfolio: "https://alexrivera.dev"
+          name: (req.user as any)?.name || "",
+          email: req.user?.email || "",
+          phone: "",
+          linkedin: "",
+          github: "",
+          portfolio: ""
         },
-        summary: "Results-driven senior developer with specialized expertise scaling resilient backend systems, optimizing distributed databases, and deploying high-concurrency microservice cloud patterns.",
+        summary: "",
         experience: [
           {
             id: "exp_1",
-            company: "Enterprise Platforms Protocol",
-            role: "Senior Backend Systems Engineer",
-            dates: "2021 - Present",
-            description: "• Architected distributed service clusters supporting 15,000+ simultaneous read/write cycles.\n• Implemented optimized token interception and JWT verification strategies, eliminating core authorization bottlenecks.\n• Streamlined continuous deployment workflows via automated server broadcast listeners."
+            company: "",
+            role: "",
+            dates: "",
+            description: ""
           }
         ],
-        skills: "TypeScript, Node.js, React, Next.js, PostgreSQL, Redis Caching, Docker Containerization"
+        skills: ""
       };
     }
 
