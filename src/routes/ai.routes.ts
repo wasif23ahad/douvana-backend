@@ -9,7 +9,11 @@ import {
   analyzePipelineHealth,
   parseResumePDF,
   generateResume,
-  getJobStatus
+  getJobStatus,
+  getChatSessions,
+  getChatMessages,
+  createChatSession,
+  deleteChatSession
 } from '../controllers/ai.controller';
 import { protect } from '../middleware/auth.middleware';
 
@@ -42,5 +46,11 @@ router.post('/parse-resume', upload.single('file'), parseResumePDF);
 // Resume Builder: Generate ATS tailored resume
 router.post('/generate-resume', generateResume);
 router.get('/jobs/:jobId', getJobStatus);
+
+// Chat Session Management
+router.post('/chat/sessions', createChatSession);
+router.get('/chat/sessions', getChatSessions);
+router.get('/chat/sessions/:id/messages', getChatMessages);
+router.delete('/chat/sessions/:id', deleteChatSession);
 
 export default router;

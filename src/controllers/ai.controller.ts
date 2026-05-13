@@ -313,3 +313,99 @@ export const getJobStatus = async (req: Request, res: Response, next: NextFuncti
     next(error);
   }
 };
+
+/**
+ * @desc    Get all Chat Sessions for the current user
+ * @route   GET /api/ai/chat/sessions
+ */
+export const getChatSessions = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ success: false, message: 'Unauthorized' });
+
+    const sessions = await prisma.chatSession.findMany({
+      where: { userId },
+      orderBy: { updatedAt: 'desc' },
+      include: {
+        messages: {
+          orderBy: { createdAt: 'desc' },
+          take: 1
+        }
+      }
+    });
+
+    res.json({ success: true, data: sessions });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Get all Messages for a Chat Session
+ * @route   GET /api/ai/chat/sessions/:id/messages
+ */
+export const getChatMessages = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user?.id;
+    const id = req.params.id as string;
+    if (!userId) return res.status(401).json({ success: false, message: 'Unauthorized' });
+
+    const session = await prisma.chatSession.findUnique({ where: { id } });
+
+    if (!session || session.userId !== userId) {
+      return res.status(404).json({ success: false, message: 'Session not found' });
+    }
+
+    const messages = await prisma.chatMessage.findMany({
+      where: { sessionId: id },
+      orderBy: { createdAt: 'asc' }
+    });
+
+    res.json({ success: true, data: messages });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Create a new Chat Session
+ * @route   POST /api/ai/chat/sessions
+ */
+export const createChatSession = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ success: false, message: 'Unauthorized' });
+
+    const session = await prisma.chatSession.create({
+      data: { userId }
+    });
+
+    res.status(201).json({ success: true, data: session });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Delete a Chat Session
+ * @route   DELETE /api/ai/chat/sessions/:id
+ */
+export const deleteChatSession = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user?.id;
+    const id = req.params.id as string;
+    if (!userId) return res.status(401).json({ success: false, message: 'Unauthorized' });
+
+    const session = await prisma.chatSession.findUnique({ where: { id } });
+
+    if (!session || session.userId !== userId) {
+      return res.status(404).json({ success: false, message: 'Session not found' });
+    }
+
+    await prisma.chatSession.delete({ where: { id } });
+
+    res.json({ success: true, message: 'Chat session deleted' });
+  } catch (error) {
+    next(error);
+  }
+};
