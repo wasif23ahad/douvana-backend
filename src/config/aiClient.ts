@@ -59,19 +59,44 @@ export async function callAI(params: {
 /**
  * Streaming Support for NVIDIA NIM
  */
-export async function streamAI(params: {
+export async function* streamAI(params: {
   messages: any[];
   system?: string;
   temperature?: number;
   max_tokens?: number;
 }) {
-  return nvidiaNim.chat.completions.create({
-    model: "meta/llama-3.1-405b-instruct",
-    messages: params.system 
-      ? [{ role: 'system', content: params.system }, ...params.messages]
-      : params.messages,
-    temperature: params.temperature ?? 0.7,
-    max_tokens: params.max_tokens ?? 2000,
-    stream: true,
-  });
+  try {
+    const stream = await nvidiaNim.chat.completions.create({
+      model: "meta/llama-3.1-405b-instruct",
+      messages: params.system 
+        ? [{ role: 'system', content: params.system }, ...params.messages]
+        : params.messages,
+      temperature: params.temperature ?? 0.7,
+      max_tokens: params.max_tokens ?? 2000,
+      stream: true,
+    });
+
+    for await (const chunk of stream) {
+      yield chunk;
+    }
+  } catch (error: any) {
+    logger.warn('NVIDIA NIM streaming failed, falling back to Gemini stream:', error.message);
+
+    try {
+      const prompt = params.system 
+        ? `SYSTEM: ${params.system}\n\n${params.messages.map(m => `${m.role?.toUpperCase() || 'USER'}: ${m.content}`).join('\n')}`
+        : params.messages.map(m => `${m.role?.toUpperCase() || 'USER'}: ${m.content}`).join('\n');
+
+      const result = await geminiModel.generateContentStream(prompt);
+      for await (const chunk of result.stream) {
+        const text = chunk.text();
+        if (text) {
+          yield { choices: [{ delta: { content: text } }] } as any;
+        }
+      }
+    } catch (geminiErr: any) {
+      logger.error('Gemini fallback stream also failed:', geminiErr.message);
+      yield { choices: [{ delta: { content: "\n[System Notice: All AI backend interfaces are currently at peak capacity. Please try again in a few moments.]" } }] } as any;
+    }
+  }
 }

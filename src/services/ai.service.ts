@@ -161,9 +161,12 @@ export class AIService {
 
       for await (const chunk of stream) {
         const content = chunk.choices[0]?.delta?.content || '';
-        res.write(`data: ${JSON.stringify({ type: 'delta', content })}\n\n`);
+        if (content) {
+          res.write(`data: ${JSON.stringify({ type: 'delta', content })}\n\n`);
+        }
       }
 
+      res.write(`data: ${JSON.stringify({ type: 'complete' })}\n\n`);
       res.end();
       await this.logAIUsage({
         userId,
@@ -173,6 +176,7 @@ export class AIService {
       });
     } catch (error: any) {
       logger.error('Career Coach Agent Error:', error.message);
+      res.write(`data: ${JSON.stringify({ type: 'error', message: error.message || 'AI Service Gateway unavailable' })}\n\n`);
       res.end();
     }
   }
