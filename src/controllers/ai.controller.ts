@@ -234,7 +234,8 @@ export const parseResumePDF = async (req: Request, res: Response, next: NextFunc
     }
 
     const dataBuffer = file.buffer;
-    const pdfParse = (await import('pdf-parse')).default;
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const pdfParse = require('pdf-parse') as (buffer: Buffer) => Promise<{ text: string }>;
     const pdfData = await pdfParse(dataBuffer);
     const parsedResume = await aiService.parseResumeData(pdfData.text, req.user?.id);
 
