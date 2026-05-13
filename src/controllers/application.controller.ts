@@ -72,7 +72,6 @@ export const createApplication = async (req: Request, res: Response, next: NextF
       company, 
       status, 
       location, 
-      jobType, 
       jobUrl, 
       salaryMin, 
       salaryMax, 
@@ -92,7 +91,6 @@ export const createApplication = async (req: Request, res: Response, next: NextF
           company,
           status: status || 'SAVED',
           location,
-          jobType,
           jobUrl,
           salaryMin,
           salaryMax,
@@ -129,7 +127,7 @@ export const createApplication = async (req: Request, res: Response, next: NextF
  */
 export const getApplicationById = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { id } = req.params;
+    const id = req.params.id as string;
     const userId = req.user?.id;
 
     const application = await prisma.application.findFirst({
@@ -163,7 +161,7 @@ export const getApplicationById = async (req: Request, res: Response, next: Next
  */
 export const updateApplication = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { id } = req.params;
+    const id = req.params.id as string;
     const userId = req.user?.id;
     const updateData = req.body;
 
@@ -196,7 +194,7 @@ export const updateApplication = async (req: Request, res: Response, next: NextF
  */
 export const updateApplicationStatus = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { id } = req.params;
+    const id = req.params.id as string;
     const { status } = req.body;
     const userId = req.user?.id;
 
@@ -246,7 +244,7 @@ export const updateApplicationStatus = async (req: Request, res: Response, next:
  */
 export const deleteApplication = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { id } = req.params;
+    const id = req.params.id as string;
     const userId = req.user?.id;
 
     const application = await prisma.application.findFirst({
@@ -277,7 +275,7 @@ export const deleteApplication = async (req: Request, res: Response, next: NextF
  */
 export const getActivities = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { id } = req.params;
+    const id = req.params.id as string;
     const userId = req.user?.id;
 
     const activities = await prisma.activity.findMany({

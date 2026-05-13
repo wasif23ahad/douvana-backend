@@ -38,7 +38,7 @@ export const parseJD = async (req: Request, res: Response, next: NextFunction) =
  */
 export const analyzeResumeSSE = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { applicationId } = req.params;
+    const applicationId = req.params.applicationId as string;
     const userId = req.user?.id;
 
     if (!userId) return res.status(401).json({ success: false, message: 'Unauthorized' });

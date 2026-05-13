@@ -7,11 +7,11 @@ export const getAdminStats = async (req: Request, res: Response, next: NextFunct
     const [userCount, appCount, aiLogCount] = await Promise.all([
       prisma.user.count(),
       prisma.application.count(),
-      prisma.aiLog.count(),
+      prisma.aILog.count(),
     ]);
 
     // Token consumption
-    const tokenStats = await prisma.aiLog.aggregate({
+    const tokenStats = await prisma.aILog.aggregate({
       _sum: {
         inputTokens: true,
         outputTokens: true,
