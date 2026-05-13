@@ -3,6 +3,7 @@ import { aiService } from '../services/ai.service.js';
 import { prisma } from '../lib/prisma.js';
 import logger from '../lib/logger.js';
 import { redis } from '../lib/redis.js';
+import pdfParse from 'pdf-parse';
 
 /**
  * @desc    Agent 1: Analyze Job Description (Non-streaming)
@@ -217,6 +218,96 @@ export const analyzePipelineHealth = async (req: Request, res: Response, next: N
     await redis.setex(cacheKey, 6 * 60 * 60, JSON.stringify(healthData));
 
     res.json({ success: true, data: healthData });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Agent: Parse Resume PDF
+ * @route   POST /api/ai/parse-resume
+ */
+export const parseResumePDF = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const file = req.file;
+    if (!file) {
+      return res.status(400).json({ success: false, message: 'No PDF file uploaded' });
+    }
+
+    const dataBuffer = file.buffer;
+    // @ts-ignore
+    const pdfData = await pdfParse(dataBuffer);
+    const parsedResume = await aiService.parseResumeData(pdfData.text, req.user?.id);
+
+    res.json({ success: true, data: parsedResume });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Agent: Generate Tailored Resume
+ * @route   POST /api/ai/generate-resume
+ */
+export const generateResume = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { applicationId, templateId } = req.body;
+    const userId = req.user?.id;
+
+    if (!userId) return res.status(401).json({ success: false, message: 'Unauthorized' });
+
+    // Since we don't have BullMQ yet, we simulate an async job queue using Redis
+    // and execute the task asynchronously.
+    const jobId = `job_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+    
+    // Initial status
+    await redis.setex(`job:${jobId}`, 3600, JSON.stringify({ status: 'processing' }));
+
+    // Run async without blocking response
+    setImmediate(async () => {
+      try {
+        const application = await prisma.application.findUnique({ where: { id: applicationId } });
+        const masterResume = await prisma.masterResume.findUnique({ where: { userId } });
+
+        if (!application || !masterResume) {
+          throw new Error('Application or Master Resume not found');
+        }
+
+        const jdAnalysis = application.parsedData || { 
+          roleInsights: application.jobTitle, 
+          requiredSkills: [] 
+        };
+
+        const result = await aiService.generateResume(masterResume.data, jdAnalysis);
+
+        // Store result
+        await redis.setex(`job:${jobId}`, 3600, JSON.stringify({ status: 'completed', result }));
+      } catch (error: any) {
+        logger.error('Background Resume Gen error:', error);
+        await redis.setex(`job:${jobId}`, 3600, JSON.stringify({ status: 'failed', error: error.message }));
+      }
+    });
+
+    res.json({ success: true, data: { jobId } });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Get Job Status
+ * @route   GET /api/ai/jobs/:jobId
+ */
+export const getJobStatus = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { jobId } = req.params;
+    const jobDataStr = await redis.get(`job:${jobId}`);
+
+    if (!jobDataStr) {
+      return res.status(404).json({ success: false, message: 'Job not found' });
+    }
+
+    res.json({ success: true, data: JSON.parse(jobDataStr) });
   } catch (error) {
     next(error);
   }

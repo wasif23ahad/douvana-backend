@@ -95,6 +95,16 @@ Return ONLY valid JSON: { "health_score": number, "summary": string, "insights":
     ],
     "skills": ["Skill 1", "..."]
   }`,
+
+  RESUME_PARSER_SYSTEM: `You are an AI resume parser.
+  Extract the following JSON structure from the provided text:
+  {
+    "personalInfo": { "name": "", "email": "", "phone": "", "linkedin": "" },
+    "summary": "",
+    "experience": [{ "id": "", "company": "", "role": "", "dates": "", "description": "" }],
+    "skills": "comma separated string"
+  }
+  Only return the raw JSON object.`,
 };
 
 export function buildATSAnalyzerPrompt(resumeData: any, jobDescription: string): string {

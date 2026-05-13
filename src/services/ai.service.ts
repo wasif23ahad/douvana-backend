@@ -217,6 +217,42 @@ export class AIService {
   }
 
   /**
+   * Agent: Resume PDF Parser
+   */
+  async parseResumeData(text: string, userId?: string) {
+    const startTime = Date.now();
+    try {
+      const response = await callAI({
+        system: prompts.RESUME_PARSER_SYSTEM || 'You are an AI resume parser. Extract the following JSON structure from the provided text: { personalInfo: { name, email, phone, linkedin }, summary: "", experience: [{ id, company, role, dates, description }], skills: "comma separated string" }. Only return the raw JSON object.',
+        messages: [{ role: 'user', content: text }],
+        temperature: 0.1,
+        jsonMode: true,
+      });
+
+      const parsedData = JSON.parse(response || '{}');
+      
+      await this.logAIUsage({
+        userId,
+        feature: 'RESUME_PARSER',
+        latencyMs: Date.now() - startTime,
+        success: true,
+      });
+
+      return parsedData;
+    } catch (error: any) {
+      logger.error('Resume Parser Agent Error:', error.message);
+      await this.logAIUsage({
+        userId,
+        feature: 'RESUME_PARSER',
+        latencyMs: Date.now() - startTime,
+        success: false,
+        errorMsg: error.message,
+      });
+      throw error;
+    }
+  }
+
+  /**
    * Agent 6: Pipeline Health
    */
   async analyzePipelineHealth(stats: any, userId: string) {

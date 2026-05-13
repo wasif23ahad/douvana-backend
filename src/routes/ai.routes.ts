@@ -1,15 +1,20 @@
 import { Router } from 'express';
+import multer from 'multer';
 import { 
   parseJD,
   analyzeResumeSSE,
   generateCoverLetterSSE,
   generateEmail,
   chatSSE,
-  analyzePipelineHealth
+  analyzePipelineHealth,
+  parseResumePDF,
+  generateResume,
+  getJobStatus
 } from '../controllers/ai.controller.js';
 import { protect } from '../middleware/auth.middleware.js';
 
 const router = Router();
+const upload = multer({ storage: multer.memoryStorage() });
 
 router.use(protect);
 
@@ -30,5 +35,12 @@ router.post('/chat/sse', chatSSE);
 
 // Agent 6: Pipeline Health
 router.get('/pipeline-health', analyzePipelineHealth);
+
+// Resume Builder: PDF Parse
+router.post('/parse-resume', upload.single('file'), parseResumePDF);
+
+// Resume Builder: Generate ATS tailored resume
+router.post('/generate-resume', generateResume);
+router.get('/jobs/:jobId', getJobStatus);
 
 export default router;
