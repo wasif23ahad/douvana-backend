@@ -240,6 +240,14 @@ export const parseResumePDF = async (req: Request, res: Response, next: NextFunc
     const pdfData = await parseFn(dataBuffer);
     const parsedResume = await aiService.parseResumeData(pdfData.text, req.user?.id);
 
+    if (req.user?.id && parsedResume) {
+      await prisma.masterResume.upsert({
+        where: { userId: req.user.id },
+        update: { data: parsedResume },
+        create: { userId: req.user.id, data: parsedResume }
+      });
+    }
+
     res.json({ success: true, data: parsedResume });
   } catch (error) {
     next(error);
