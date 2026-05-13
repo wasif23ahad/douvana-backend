@@ -1,11 +1,11 @@
 import { Router } from 'express';
-import authRoutes from './auth.routes.js';
-import templateRoutes from './template.routes.js';
-import applicationRoutes from './application.routes.js';
-import aiRoutes from './ai.routes.js';
-import notificationRoutes from './notification.routes.js';
-import adminRoutes from './admin.routes.js';
-import resumeRoutes from './resume.routes.js';
+import authRoutes from './auth.routes';
+import templateRoutes from './template.routes';
+import applicationRoutes from './application.routes';
+import aiRoutes from './ai.routes';
+import notificationRoutes from './notification.routes';
+import adminRoutes from './admin.routes';
+import resumeRoutes from './resume.routes';
 
 const router = Router();
 

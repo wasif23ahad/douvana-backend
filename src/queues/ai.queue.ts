@@ -1,8 +1,8 @@
 import { Queue, Worker, Job } from 'bullmq';
-import redis from '../lib/redis.js';
-import { aiService } from '../services/ai.service.js';
-import prisma from '../lib/prisma.js';
-import logger from '../lib/logger.js';
+import redis from '../lib/redis';
+import { aiService } from '../services/ai.service';
+import prisma from '../lib/prisma';
+import logger from '../lib/logger';
 import { Prisma } from '@prisma/client';
 
 const QUEUE_NAME = 'ai-tasks';
@@ -74,7 +74,7 @@ export const aiWorker = new Worker(
         });
 
         // Emit SSE
-        import('../lib/sse.js').then(({ sseManager }) => {
+        import('../lib/sse').then(({ sseManager }) => {
           sseManager.sendToUser(userId, notification);
         });
 

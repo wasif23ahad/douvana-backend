@@ -1,7 +1,7 @@
 import OpenAI from 'openai';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { env } from './env.js';
-import logger from '../lib/logger.js';
+import { env } from './env';
+import logger from '../lib/logger';
 
 // NVIDIA NIM (OpenAI Compatible)
 export const nvidiaNim = new OpenAI({

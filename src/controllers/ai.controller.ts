@@ -1,8 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
-import { aiService } from '../services/ai.service.js';
-import { prisma } from '../lib/prisma.js';
-import logger from '../lib/logger.js';
-import { redis } from '../lib/redis.js';
+import { aiService } from '../services/ai.service';
+import { prisma } from '../lib/prisma';
+import logger from '../lib/logger';
+import { redis } from '../lib/redis';
 import pdfParse from 'pdf-parse';
 
 /**

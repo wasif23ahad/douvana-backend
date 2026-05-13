@@ -10,8 +10,8 @@ import {
   parseResumePDF,
   generateResume,
   getJobStatus
-} from '../controllers/ai.controller.js';
-import { protect } from '../middleware/auth.middleware.js';
+} from '../controllers/ai.controller';
+import { protect } from '../middleware/auth.middleware';
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage() });

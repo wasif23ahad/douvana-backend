@@ -1,7 +1,7 @@
-import { prisma } from '../lib/prisma.js';
-import logger from '../lib/logger.js';
-import { prompts, buildATSAnalyzerPrompt, buildCoverLetterPrompt } from './aiPrompts.js';
-import { callAI, streamAI } from '../config/aiClient.js';
+import { prisma } from '../lib/prisma';
+import logger from '../lib/logger';
+import { prompts, buildATSAnalyzerPrompt, buildCoverLetterPrompt } from './aiPrompts';
+import { callAI, streamAI } from '../config/aiClient';
 import { Response } from 'express';
 
 export class AIService {

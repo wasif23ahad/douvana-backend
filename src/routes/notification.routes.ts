@@ -1,7 +1,7 @@
 import { Router } from 'express';
-import { protect } from '../middleware/auth.middleware.js';
-import prisma from '../lib/prisma.js';
-import { sseManager } from '../lib/sse.js';
+import { protect } from '../middleware/auth.middleware';
+import prisma from '../lib/prisma';
+import { sseManager } from '../lib/sse';
 
 const router = Router();
 

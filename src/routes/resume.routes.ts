@@ -1,6 +1,6 @@
 import { Router } from 'express';
-import { getMasterResume, updateMasterResume } from '../controllers/resume.controller.js';
-import { protect } from '../middleware/auth.middleware.js';
+import { getMasterResume, updateMasterResume } from '../controllers/resume.controller';
+import { protect } from '../middleware/auth.middleware';
 
 const router = Router();
 

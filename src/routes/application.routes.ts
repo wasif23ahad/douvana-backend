@@ -7,8 +7,8 @@ import {
   updateApplicationStatus, 
   deleteApplication,
   getActivities
-} from '../controllers/application.controller.js';
-import { protect } from '../middleware/auth.middleware.js';
+} from '../controllers/application.controller';
+import { protect } from '../middleware/auth.middleware';
 
 const router = Router();
 
