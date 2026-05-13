@@ -3,7 +3,6 @@ import { aiService } from '../services/ai.service';
 import { prisma } from '../lib/prisma';
 import logger from '../lib/logger';
 import { redis } from '../lib/redis';
-import pdfParse from 'pdf-parse';
 
 /**
  * @desc    Agent 1: Analyze Job Description (Non-streaming)
@@ -235,7 +234,7 @@ export const parseResumePDF = async (req: Request, res: Response, next: NextFunc
     }
 
     const dataBuffer = file.buffer;
-    // @ts-ignore
+    const pdfParse = (await import('pdf-parse')).default;
     const pdfData = await pdfParse(dataBuffer);
     const parsedResume = await aiService.parseResumeData(pdfData.text, req.user?.id);
 
