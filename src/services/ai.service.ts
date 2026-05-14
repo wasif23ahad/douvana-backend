@@ -1,6 +1,6 @@
 import { prisma } from '../lib/prisma';
 import logger from '../lib/logger';
-import { prompts, buildATSAnalyzerPrompt, buildCoverLetterPrompt } from './aiPrompts';
+import { prompts, buildATSAnalyzerPrompt, buildATSAnalyzerPromptFromText, buildCoverLetterPrompt } from './aiPrompts';
 import { callAI, streamAI } from '../config/aiClient';
 import { Response } from 'express';
 
@@ -52,7 +52,9 @@ export class AIService {
     res.setHeader('Connection', 'keep-alive');
 
     try {
-      const prompt = buildATSAnalyzerPrompt(resumeData, jobDescription);
+      const prompt = (resumeData as any)?.rawText
+        ? buildATSAnalyzerPromptFromText((resumeData as any).rawText, jobDescription)
+        : buildATSAnalyzerPrompt(resumeData, jobDescription);
       const stream = await streamAI({
         system: prompts.ATS_ANALYZER_SYSTEM,
         messages: [{ role: 'user', content: prompt }],
@@ -278,6 +280,46 @@ export class AIService {
       return healthData;
     } catch (error: any) {
       logger.error('Pipeline Health Agent Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Agent: General Text Enhancement (Summary / Bullets)
+   */
+  async enhanceText(text: string, type: string, userId?: string) {
+    const startTime = Date.now();
+    try {
+      const systemPrompt = type === 'summary'
+        ? 'You are an expert technical resume writer. Rewrite the provided professional summary to be highly compelling, concise, impactful, and ATS-optimized using rich engineering vocabulary. Return ONLY the polished plain text without any introductory remarks, formatting wrappers, or quotes.'
+        : 'You are an expert technical resume writer. Rewrite the provided work experience bullet points or intelligence logs to be highly quantified, metrics-driven, begin with strong action verbs, and clearly demonstrate technical complexity and outcomes. Return ONLY the polished plain text without any introductory remarks, formatting wrappers, or quotes.';
+
+      const response = await callAI({
+        system: systemPrompt,
+        messages: [{ role: 'user', content: text }],
+        temperature: 0.3,
+        jsonMode: false,
+      });
+
+      const enhancedText = response?.replace(/^["'\n]+|["'\n]+$/g, '').trim() || text;
+
+      await this.logAIUsage({
+        userId,
+        feature: type === 'summary' ? 'ENHANCE_SUMMARY' : 'ENHANCE_BULLETS',
+        latencyMs: Date.now() - startTime,
+        success: true,
+      });
+
+      return enhancedText;
+    } catch (error: any) {
+      logger.error('Enhance Text Agent Error:', error.message);
+      await this.logAIUsage({
+        userId,
+        feature: type === 'summary' ? 'ENHANCE_SUMMARY' : 'ENHANCE_BULLETS',
+        latencyMs: Date.now() - startTime,
+        success: false,
+        errorMsg: error.message,
+      });
       throw error;
     }
   }

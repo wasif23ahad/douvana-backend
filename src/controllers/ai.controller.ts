@@ -3,6 +3,8 @@ import { aiService } from '../services/ai.service';
 import { prisma } from '../lib/prisma';
 import logger from '../lib/logger';
 import { redis } from '../lib/redis';
+import { buildATSAnalyzerPromptFromText, buildCoverLetterPrompt, prompts } from '../services/aiPrompts';
+import { streamAI } from '../config/aiClient';
 
 /**
  * @desc    Agent 1: Analyze Job Description (Non-streaming)
@@ -521,6 +523,85 @@ export const deleteChatSession = async (req: Request, res: Response, next: NextF
     await prisma.chatSession.delete({ where: { id } });
 
     res.json({ success: true, message: 'Chat session deleted' });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    ATS Analyzer — direct text input (no applicationId required)
+ * @route   POST /api/ai/analyze-resume/direct
+ */
+export const analyzeResumeDirect = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { resumeContent, jobDescription } = req.body;
+    const userId = req.user?.id;
+
+    if (!userId) return res.status(401).json({ success: false, message: 'Unauthorized' });
+    if (!resumeContent || !jobDescription) {
+      return res.status(400).json({ success: false, message: 'resumeContent and jobDescription are required' });
+    }
+
+    await aiService.analyzeResumeSSE(
+      { rawText: resumeContent },
+      jobDescription,
+      res,
+      userId
+    );
+  } catch (error) {
+    logger.error('ATS Analyzer Direct Error:', error);
+    if (!res.headersSent) next(error);
+  }
+};
+
+/**
+ * @desc    Cover Letter Generator — direct input (no applicationId required)
+ * @route   POST /api/ai/generate-cover-letter/direct
+ */
+export const generateCoverLetterDirect = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { jobTitle, companyName, hiringManager, tone, customInstructions, jobDescription } = req.body;
+    const userId = req.user?.id;
+
+    if (!userId) return res.status(401).json({ success: false, message: 'Unauthorized' });
+    if (!jobTitle || !companyName) {
+      return res.status(400).json({ success: false, message: 'jobTitle and companyName are required' });
+    }
+
+    const masterResume = await prisma.masterResume.findUnique({ where: { userId } });
+
+    const params = {
+      jobTitle,
+      companyName,
+      hiringManager: hiringManager || '',
+      tone: tone || 'professional',
+      customInstructions: customInstructions || '',
+      jobDescription: jobDescription || '',
+      resumeSummary: masterResume?.data || {}
+    };
+
+    await aiService.generateCoverLetterSSE(params, res, userId);
+  } catch (error) {
+    logger.error('Cover Letter Direct Error:', error);
+    if (!res.headersSent) next(error);
+  }
+};
+
+/**
+ * @desc    Agent: Enhance Text (Summary / Bullets)
+ * @route   POST /api/ai/enhance-text
+ */
+export const enhanceText = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { text, type } = req.body;
+    const userId = req.user?.id;
+
+    if (!text) {
+      return res.status(400).json({ success: false, message: 'Text input is required' });
+    }
+
+    const enhanced = await aiService.enhanceText(text, type || 'summary', userId);
+    res.json({ success: true, data: enhanced });
   } catch (error) {
     next(error);
   }

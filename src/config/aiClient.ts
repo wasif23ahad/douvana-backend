@@ -167,26 +167,35 @@ export async function* streamAI(params: {
       const sys = params.system || '';
       if (sys.includes('senior ATS optimization expert')) {
         const payload = JSON.stringify({
-          ats_score: 92,
-          strengths: [
-            "Comprehensive full-stack system architecture documentation",
-            "Strong evidence of high-concurrency Node.js and REST integration",
-            "Robust testing and continuous delivery execution paths"
-          ],
-          keyword_gap_analysis: [
-            "GraphQL Subscriptions",
-            "gRPC Streaming",
-            "Kubernetes Pod Orchestration"
-          ],
-          prioritized_improvement_suggestions: [
+          ats_score: 72,
+          keyword_match_rate: 0.65,
+          present_keywords: ["Node.js", "TypeScript", "REST APIs", "PostgreSQL"],
+          missing_keywords: ["GraphQL", "Kubernetes", "gRPC", "Microservices"],
+          suggested_summary: "Results-driven Backend Engineer with expertise in scalable Node.js architectures, REST API design, and PostgreSQL optimization. Seeking to leverage 3+ years of experience building high-concurrency distributed systems.",
+          suggested_bullet_rewrites: [
             {
               original: "Built standard user features.",
-              improved: "Architected multi-tenant OAuth and JWT authorization workflows securing core data endpoints for 10K+ concurrent user sessions."
+              improved: "Architected multi-tenant OAuth and JWT authorization workflows securing core data endpoints for 10K+ concurrent user sessions.",
+              reason: "Adds quantification and technical specificity recruiters scan for.",
+              impact_score: 9
             },
             {
               original: "Optimized frontend components.",
-              improved: "Implemented reactive state streaming with progressive rendering techniques, eliminating cumulative layout shifts and speeding hydration by 35%."
+              improved: "Implemented reactive state streaming with progressive rendering, eliminating cumulative layout shifts and improving Core Web Vitals by 35%.",
+              reason: "Quantified impact shows measurable engineering outcomes.",
+              impact_score: 8
             }
+          ],
+          section_scores: { summary: 70, experience: 75, skills: 80, education: 65 },
+          overall_suggestions: [
+            "Add Kubernetes and container orchestration experience to skills section.",
+            "Quantify database performance improvements with specific metrics.",
+            "Include GraphQL as an additional API paradigm in your skill set."
+          ],
+          strengths: [
+            "Strong Node.js and TypeScript foundation well-matched to role requirements.",
+            "PostgreSQL expertise directly aligns with database requirements.",
+            "REST API experience matches core technical expectations."
           ]
         });
         yield { choices: [{ delta: { content: payload } }] } as any;

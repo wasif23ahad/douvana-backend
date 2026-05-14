@@ -124,6 +124,40 @@ ${jobDescription}
 Analyze and return ONLY the requested JSON structure.`;
 }
 
+export function buildATSAnalyzerPromptFromText(resumeContent: string, jobDescription: string): string {
+  return `
+RESUME CONTENT:
+${resumeContent}
+
+JOB DESCRIPTION:
+${jobDescription}
+
+Analyze and return ONLY this JSON structure:
+{
+  "ats_score": number (0-100),
+  "keyword_match_rate": number (0.0-1.0),
+  "missing_keywords": string[],
+  "present_keywords": string[],
+  "suggested_summary": string,
+  "suggested_bullet_rewrites": [
+    {
+      "original": string,
+      "improved": string,
+      "reason": string,
+      "impact_score": number (1-10)
+    }
+  ],
+  "section_scores": {
+    "summary": number (0-100),
+    "experience": number (0-100),
+    "skills": number (0-100),
+    "education": number (0-100)
+  },
+  "overall_suggestions": string[],
+  "strengths": string[]
+}`;
+}
+
 export function buildCoverLetterPrompt(params: any): string {
   return `
 Generate 3 cover letter variants for this application.

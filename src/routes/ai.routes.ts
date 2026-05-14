@@ -1,9 +1,11 @@
 import { Router } from 'express';
 import multer from 'multer';
-import { 
+import {
   parseJD,
   analyzeResumeSSE,
+  analyzeResumeDirect,
   generateCoverLetterSSE,
+  generateCoverLetterDirect,
   generateEmail,
   chatSSE,
   analyzePipelineHealth,
@@ -13,7 +15,8 @@ import {
   getChatSessions,
   getChatMessages,
   createChatSession,
-  deleteChatSession
+  deleteChatSession,
+  enhanceText
 } from '../controllers/ai.controller';
 import { protect } from '../middleware/auth.middleware';
 
@@ -27,12 +30,15 @@ router.post('/parse-jd', parseJD);
 
 // Agent 2: ATS Analyzer (SSE)
 router.get('/analyze-resume/sse/:applicationId', analyzeResumeSSE);
+router.post('/analyze-resume/direct', analyzeResumeDirect);
 
 // Agent 3: Cover Letter (SSE)
 router.post('/generate-cover-letter/sse', generateCoverLetterSSE);
+router.post('/generate-cover-letter/direct', generateCoverLetterDirect);
 
 // Agent 4: Email Draft
 router.post('/generate-email', generateEmail);
+router.post('/enhance-text', enhanceText);
 
 // Agent 5: Career Coach (SSE)
 router.post('/chat/sse', chatSSE);
