@@ -600,7 +600,8 @@ export const enhanceText = async (req: Request, res: Response, next: NextFunctio
       return res.status(400).json({ success: false, message: 'Text input is required' });
     }
 
-    const enhanced = await aiService.enhanceText(text, type || 'summary', userId);
+    const resolvedType = ['summary', 'bullets'].includes(type) ? type : 'summary';
+    const enhanced = await aiService.enhanceText(text, resolvedType, userId);
     res.json({ success: true, data: enhanced });
   } catch (error) {
     next(error);

@@ -2,10 +2,10 @@ import { Request, Response, NextFunction } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt, { SignOptions } from 'jsonwebtoken';
 import { prisma } from '../lib/prisma';
+import { z } from 'zod';
 // @ts-ignore
 import { AppStatus, Platform } from '@prisma/client';
 
-// Generate JWT
 const generateToken = (id: string) => {
   return jwt.sign({ id }, process.env.JWT_SECRET!, {
     expiresIn: (process.env.JWT_EXPIRES_IN || '1h') as SignOptions['expiresIn'],
@@ -13,12 +13,13 @@ const generateToken = (id: string) => {
 };
 
 const generateRefreshToken = (id: string) => {
-  return jwt.sign({ id }, process.env.JWT_REFRESH_SECRET!, {
+  return jwt.sign({ id }, process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET!, {
     expiresIn: (process.env.JWT_REFRESH_EXPIRES_IN || '7d') as SignOptions['expiresIn'],
   });
 };
 
 const seedInitialProfileForUser = async (user: any) => {
+  if (process.env.NODE_ENV === 'production') return;
   try {
     await prisma.user.update({
       where: { id: user.id },
@@ -72,7 +73,7 @@ const seedInitialProfileForUser = async (user: any) => {
           location: 'Mountain View, CA',
           salaryMin: 180000,
           salaryMax: 220000,
-          jobDescription: 'We are looking for a Senior Full Stack Engineer to lead new architecture projects focusing on high-performance distributed systems, machine learning workflows, and responsive Next.js application frontends.',
+          jobDescription: 'We are looking for a Senior Full Stack Engineer to lead new architecture projects focusing on high-performance distributed systems.',
           notes: 'Completed screening call with recruiter. Technical rounds scheduled for next Tuesday.',
         },
         {
@@ -84,7 +85,7 @@ const seedInitialProfileForUser = async (user: any) => {
           location: 'Los Gatos, CA',
           salaryMin: 190000,
           salaryMax: 240000,
-          jobDescription: 'Netflix is looking for specialized backend engineers to optimize media delivery orchestration, implement advanced caching algorithms, and ensure globally distributed fault tolerance.',
+          jobDescription: 'Netflix is looking for specialized backend engineers to optimize media delivery orchestration.',
           notes: 'Applied through referral. Resume parsed and matching keywords detected.',
         },
         {
@@ -96,36 +97,58 @@ const seedInitialProfileForUser = async (user: any) => {
           location: 'Remote',
           salaryMin: 160000,
           salaryMax: 195000,
-          jobDescription: 'Seeking frontend architects to evolve the future of Web frameworks and client infrastructure. Deep knowledge of React Server Components, compilation optimizations, and Edge routing required.',
+          jobDescription: 'Seeking frontend architects to evolve the future of Web frameworks and client infrastructure.',
           notes: 'Submitted portfolio and tailored resume variant via platform portal.',
         },
       ],
     });
-
-    console.log(`✅ Seeded initial beautiful profile and applications for user ${user.id}`);
   } catch (error) {
     console.error('Failed to seed initial profile for user:', error);
   }
 };
 
+const registerSchema = z.object({
+  name: z.string().min(1, 'Name is required'),
+  email: z.string().email('Invalid email address'),
+  password: z.string().min(8, 'Password must be at least 8 characters'),
+});
+
+const loginSchema = z.object({
+  email: z.string().email('Invalid email address'),
+  password: z.string().min(1, 'Password is required'),
+});
+
+const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1, 'Current password is required'),
+  newPassword: z.string().min(8, 'New password must be at least 8 characters'),
+});
+
+const updateMeSchema = z.object({
+  name: z.string().min(1).optional(),
+  headline: z.string().optional(),
+  location: z.string().optional(),
+  bio: z.string().optional(),
+  linkedinUrl: z.string().url().optional().or(z.literal('')),
+  githubUrl: z.string().url().optional().or(z.literal('')),
+  portfolioUrl: z.string().url().optional().or(z.literal('')),
+});
+
 export const register = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { email, password, name } = req.body;
+    const parsed = registerSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ message: parsed.error.issues[0].message });
+    }
+    const { email, password, name } = parsed.data;
 
     const userExists = await prisma.user.findUnique({ where: { email } });
-
     if (userExists) {
       return res.status(400).json({ message: 'User already exists' });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
-
     const user = await prisma.user.create({
-      data: {
-        email,
-        password: hashedPassword,
-        name,
-      },
+      data: { email, password: hashedPassword, name },
     });
 
     await seedInitialProfileForUser(user);
@@ -145,23 +168,36 @@ export const register = async (req: Request, res: Response, next: NextFunction) 
 
 export const login = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { email, password } = req.body;
+    const parsed = loginSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ message: parsed.error.issues[0].message });
+    }
+    const { email, password } = parsed.data;
 
     const user = await prisma.user.findUnique({ where: { email } });
 
-    if (user && (await bcrypt.compare(password, user.password!))) {
-      res.json({
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        avatar: user.avatar,
-        token: generateToken(user.id),
-        refreshToken: generateRefreshToken(user.id),
-      });
-    } else {
-      res.status(401).json({ message: 'Invalid email or password' });
+    if (!user || !user.isActive) {
+      return res.status(401).json({ message: 'Invalid email or password' });
     }
+
+    if (!user.password) {
+      return res.status(401).json({ message: 'This account uses Google Sign-In. Please log in with Google.' });
+    }
+
+    const passwordMatch = await bcrypt.compare(password, user.password);
+    if (!passwordMatch) {
+      return res.status(401).json({ message: 'Invalid email or password' });
+    }
+
+    res.json({
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      avatar: user.avatar,
+      token: generateToken(user.id),
+      refreshToken: generateRefreshToken(user.id),
+    });
   } catch (error) {
     next(error);
   }
@@ -172,7 +208,7 @@ export const refreshToken = async (req: Request, res: Response, next: NextFuncti
     const { refreshToken: token } = req.body;
     if (!token) return res.status(400).json({ message: 'Refresh token required' });
 
-    const decoded: any = jwt.verify(token, process.env.JWT_REFRESH_SECRET!);
+    const decoded: any = jwt.verify(token, process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET!);
     const user = await prisma.user.findUnique({
       where: { id: decoded.id },
       select: { id: true, email: true, name: true, role: true, avatar: true, isActive: true },
@@ -219,6 +255,72 @@ export const getMe = async (req: Request, res: Response, next: NextFunction) => 
   }
 };
 
+export const updateMe = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const parsed = updateMeSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ message: parsed.error.issues[0].message });
+    }
+
+    const user = await prisma.user.update({
+      where: { id: req.user!.id },
+      data: parsed.data,
+      select: {
+        id: true, name: true, email: true, role: true, avatar: true,
+        headline: true, location: true, bio: true, linkedinUrl: true,
+        githubUrl: true, portfolioUrl: true,
+      },
+    });
+
+    res.json({ success: true, data: user });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const changePassword = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const parsed = changePasswordSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ message: parsed.error.issues[0].message });
+    }
+    const { currentPassword, newPassword } = parsed.data;
+
+    const user = await prisma.user.findUnique({ where: { id: req.user!.id } });
+    if (!user || !user.password) {
+      return res.status(400).json({ message: 'Password change is not available for Google accounts' });
+    }
+
+    const valid = await bcrypt.compare(currentPassword, user.password);
+    if (!valid) {
+      return res.status(400).json({ message: 'Current password is incorrect' });
+    }
+
+    const hashed = await bcrypt.hash(newPassword, 10);
+    await prisma.user.update({
+      where: { id: req.user!.id },
+      data: { password: hashed },
+    });
+
+    res.json({ success: true, message: 'Password updated successfully' });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const deleteMe = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    await prisma.user.update({
+      where: { id: req.user!.id },
+      data: { isActive: false },
+    });
+
+    res.json({ success: true, message: 'Account deactivated successfully' });
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const googleLogin = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { email, name, googleId, avatar } = req.body;
@@ -230,7 +332,9 @@ export const googleLogin = async (req: Request, res: Response, next: NextFunctio
     let user = await prisma.user.findUnique({ where: { email } });
 
     if (user) {
-      // User exists, update googleId and avatar if not present
+      if (!user.isActive) {
+        return res.status(401).json({ message: 'This account has been deactivated' });
+      }
       if (!user.googleId || !user.avatar) {
         user = await prisma.user.update({
           where: { email },
@@ -241,14 +345,8 @@ export const googleLogin = async (req: Request, res: Response, next: NextFunctio
         });
       }
     } else {
-      // Create new user
       user = await prisma.user.create({
-        data: {
-          email,
-          name,
-          googleId,
-          avatar,
-        },
+        data: { email, name, googleId, avatar },
       });
       await seedInitialProfileForUser(user);
     }

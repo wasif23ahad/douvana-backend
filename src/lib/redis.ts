@@ -37,6 +37,10 @@ export const redis = {
     if (!redisInstance) return;
     try { await redisInstance.del(key); } catch { /* no-op */ }
   },
+  ping: async (): Promise<void> => {
+    if (!redisInstance) throw new Error('Redis unavailable');
+    await redisInstance.ping();
+  },
   // Expose raw client for BullMQ (requires real Redis)
   raw: redisInstance,
 };

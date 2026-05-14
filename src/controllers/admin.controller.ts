@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { prisma } from '../lib/prisma';
+import { redis } from '../lib/redis';
 import { Role } from '@prisma/client';
 
 export const getAdminStats = async (req: Request, res: Response, next: NextFunction) => {
@@ -22,13 +23,11 @@ export const getAdminStats = async (req: Request, res: Response, next: NextFunct
       }
     });
 
-    // Health check logic (mocked for now but based on real DB connectivity)
-    const health = {
-      api: 'Healthy',
-      db: 'Healthy',
-      redis: 'Healthy',
-      ai: 'Healthy'
-    };
+    let dbStatus = 'Healthy';
+    let redisStatus = 'Healthy';
+    try { await prisma.$queryRaw`SELECT 1`; } catch { dbStatus = 'Degraded'; }
+    try { await redis.ping(); } catch { redisStatus = 'Unavailable'; }
+    const health = { api: 'Healthy', db: dbStatus, redis: redisStatus, ai: 'Healthy' };
 
     res.json({
       totalUsers: userCount,

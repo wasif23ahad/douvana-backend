@@ -10,8 +10,11 @@ const envSchema = z.object({
   GEMINI_API_KEY: z.string().min(1).optional(),
   FRONTEND_URL: z.string().min(1).default('http://localhost:3000'),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
-  PORT: z.coerce.number().default(8000),
+  PORT: z.coerce.number().default(5000),
   REDIS_URL: z.string().min(1).optional(),
+  JWT_REFRESH_SECRET: z.string().min(1).optional(),
+  JWT_EXPIRES_IN: z.string().default('1h'),
+  JWT_REFRESH_EXPIRES_IN: z.string().default('7d'),
 });
 
 const result = envSchema.safeParse(process.env);

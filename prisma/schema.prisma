@@ -353,6 +353,8 @@ model ChatMessage {
   role      ChatRole
   content   String      @db.Text
   createdAt DateTime    @default(now())
+
+  @@index([sessionId])
 }
 
 model AILog {

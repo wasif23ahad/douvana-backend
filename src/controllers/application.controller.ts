@@ -83,18 +83,21 @@ export const createApplication = async (req: Request, res: Response, next: NextF
       return res.status(400).json({ success: false, message: 'Job title and company are required' });
     }
 
+    const validStatuses = ['SAVED','APPLIED','SCREENING','INTERVIEW','OFFER','REJECTED','WITHDRAWN'];
+    const resolvedStatus = validStatuses.includes(status) ? status : 'SAVED';
+
     const application = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const app = await tx.application.create({
         data: {
           userId: userId!,
           jobTitle,
           company,
-          status: status || 'SAVED',
+          status: resolvedStatus,
           location,
           jobUrl,
-          salaryMin,
-          salaryMax,
-          priority: priority || 'MEDIUM',
+          salaryMin: salaryMin ? Number(salaryMin) : undefined,
+          salaryMax: salaryMax ? Number(salaryMax) : undefined,
+          priority: priority ? Number(priority) : 2,
           notes,
         },
       });
@@ -163,25 +166,36 @@ export const updateApplication = async (req: Request, res: Response, next: NextF
   try {
     const id = req.params.id as string;
     const userId = req.user?.id;
-    const updateData = req.body;
 
-    const application = await prisma.application.findFirst({
-      where: { id, userId },
-    });
-
+    const application = await prisma.application.findFirst({ where: { id, userId } });
     if (!application) {
       return res.status(404).json({ success: false, message: 'Application not found' });
     }
 
+    const {
+      jobTitle, company, status, location, jobUrl, jobDescription,
+      salaryMin, salaryMax, deadline, notes, priority, parsedData,
+    } = req.body;
+
     const updatedApplication = await prisma.application.update({
       where: { id },
-      data: updateData,
+      data: {
+        ...(jobTitle !== undefined && { jobTitle }),
+        ...(company !== undefined && { company }),
+        ...(status !== undefined && { status }),
+        ...(location !== undefined && { location }),
+        ...(jobUrl !== undefined && { jobUrl }),
+        ...(jobDescription !== undefined && { jobDescription }),
+        ...(salaryMin !== undefined && { salaryMin: Number(salaryMin) }),
+        ...(salaryMax !== undefined && { salaryMax: Number(salaryMax) }),
+        ...(deadline !== undefined && { deadline: deadline ? new Date(deadline) : null }),
+        ...(notes !== undefined && { notes }),
+        ...(priority !== undefined && { priority: Number(priority) }),
+        ...(parsedData !== undefined && { parsedData }),
+      },
     });
 
-    res.json({
-      success: true,
-      data: updatedApplication,
-    });
+    res.json({ success: true, data: updatedApplication });
   } catch (error) {
     next(error);
   }
@@ -198,8 +212,9 @@ export const updateApplicationStatus = async (req: Request, res: Response, next:
     const { status } = req.body;
     const userId = req.user?.id;
 
-    if (!status) {
-      return res.status(400).json({ success: false, message: 'Status is required' });
+    const validStatuses = ['SAVED','APPLIED','SCREENING','INTERVIEW','OFFER','REJECTED','WITHDRAWN'];
+    if (!status || !validStatuses.includes(status)) {
+      return res.status(400).json({ success: false, message: 'Valid status is required' });
     }
 
     const application = await prisma.application.findFirst({
