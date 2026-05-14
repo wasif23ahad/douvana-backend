@@ -66,7 +66,8 @@ export const analyzeResumeSSE = async (req: Request, res: Response, next: NextFu
       masterResume.data,
       application.jobDescription || '',
       res,
-      userId
+      userId,
+      { jobTitle: application.jobTitle, companyName: application.company }
     );
   } catch (error) {
     logger.error('ATS Analyzer SSE Controller Error:', error);
@@ -534,19 +535,26 @@ export const deleteChatSession = async (req: Request, res: Response, next: NextF
  */
 export const analyzeResumeDirect = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { resumeContent, jobDescription } = req.body;
+    const { resumeContent, jobDescription, jobTitle, companyName } = req.body;
     const userId = req.user?.id;
 
     if (!userId) return res.status(401).json({ success: false, message: 'Unauthorized' });
     if (!resumeContent || !jobDescription) {
       return res.status(400).json({ success: false, message: 'resumeContent and jobDescription are required' });
     }
+    if (typeof resumeContent !== 'string' || resumeContent.trim().length < 50) {
+      return res.status(400).json({ success: false, message: 'Resume content is too short to analyze. Please provide at least a few hundred characters.' });
+    }
+    if (typeof jobDescription !== 'string' || jobDescription.trim().length < 50) {
+      return res.status(400).json({ success: false, message: 'Job description is too short to analyze. Please paste the full posting.' });
+    }
 
     await aiService.analyzeResumeSSE(
       { rawText: resumeContent },
       jobDescription,
       res,
-      userId
+      userId,
+      { jobTitle, companyName }
     );
   } catch (error) {
     logger.error('ATS Analyzer Direct Error:', error);

@@ -54,22 +54,39 @@ export async function callAI(params: {
       logger.warn('AI Fallback (Gemini) failed, serving robust Agentic Mock Simulation Engine context payload');
       
       const sys = params.system || '';
-      if (sys.includes('ATS') || sys.includes('JD_PARSER')) {
+
+      // ATS Analyzer fallback — return null so the caller can run the deterministic
+      // local scorer against the actual resume + JD instead of returning a stale mock.
+      // (Returning a fixed JSON here previously caused the "score 0" bug because the
+      // mock omitted the ats_score field entirely.)
+      if (sys.includes('ATS optimization expert') || sys.includes('SCORING RUBRIC')) {
+        return null;
+      }
+
+      // JD Parser fallback (kept distinct from ATS)
+      if (sys.includes('JD_PARSER') || sys.includes('expert ATS') || sys.includes('Analyze the provided job description')) {
+        // Try to extract real signals from the user's JD payload before falling back to canned data
+        const userMsg = params.messages[params.messages.length - 1]?.content || '';
+        const jdLower = String(userMsg).toLowerCase();
+        const knownSkills = [
+          'JavaScript', 'TypeScript', 'Python', 'Java', 'Go', 'Rust', 'Kotlin', 'C++',
+          'React', 'Vue', 'Angular', 'Next.js', 'Node.js', 'Express', 'NestJS', 'Django',
+          'PostgreSQL', 'MongoDB', 'Redis', 'MySQL', 'Docker', 'Kubernetes', 'AWS', 'GCP',
+          'Azure', 'Terraform', 'GraphQL', 'REST', 'gRPC', 'Kafka', 'CI/CD', 'Microservices',
+          'Tailwind', 'Prisma', 'tRPC', 'Zustand', 'Redux'
+        ];
+        const found = knownSkills.filter(s => new RegExp(`\\b${s.replace(/\+/g, '\\+').replace(/\./g, '\\.')}\\b`, 'i').test(userMsg));
         return JSON.stringify({
-          required_skills: ["Node.js", "React", "TypeScript", "PostgreSQL", "REST APIs"],
-          preferred_skills: ["Docker", "AWS", "Redis", "Next.js"],
-          ats_keywords: ["Scalability", "Microservices", "CI/CD", "Authentication", "State Management"],
-          experience_level: "mid",
-          job_category: "Software Engineering",
-          location_type: "hybrid",
-          salary_signals: { mentioned: true, range: "$120,000 - $145,000" },
-          company_tone: "technical",
-          team_size_signals: "medium",
-          key_responsibilities: [
-            "Design and develop highly available backend services",
-            "Collaborate with product and frontend engineering teams",
-            "Optimize application performance and database queries"
-          ]
+          required_skills: found.length ? found.slice(0, 8) : ["Communication", "Problem Solving"],
+          preferred_skills: found.slice(8, 12),
+          ats_keywords: found.slice(0, 10),
+          experience_level: jdLower.includes('senior') ? 'senior' : jdLower.includes('lead') ? 'lead' : jdLower.includes('junior') || jdLower.includes('entry') ? 'entry' : 'mid',
+          job_category: jdLower.includes('frontend') ? 'Frontend Engineering' : jdLower.includes('backend') ? 'Backend Engineering' : jdLower.includes('data') ? 'Data Engineering' : 'Software Engineering',
+          location_type: jdLower.includes('remote') ? 'remote' : jdLower.includes('hybrid') ? 'hybrid' : jdLower.includes('onsite') || jdLower.includes('on-site') ? 'onsite' : 'unknown',
+          salary_signals: { mentioned: /\$[\d,]+/.test(userMsg), range: (userMsg.match(/\$[\d,]+\s*-\s*\$[\d,]+/) || [null])[0] },
+          company_tone: 'technical',
+          team_size_signals: 'unknown',
+          key_responsibilities: []
         });
       }
 
