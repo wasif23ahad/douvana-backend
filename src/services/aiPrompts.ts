@@ -96,7 +96,13 @@ Return ONLY valid JSON: { "health_score": number, "summary": string, "insights":
     "skills": ["Skill 1", "..."]
   }`,
 
-  RESUME_PARSER_SYSTEM: `You are an AI resume parser.
+  RESUME_PARSER_SYSTEM: `You are an expert AI resume parser.
+  Carefully analyze the provided resume text and extract all professional sections comprehensively.
+  Follow these extraction rules strictly:
+  1. Extract ALL work experience, employment history, and notable projects into the "experience" array. If an entry is a project, place the project name in "company" or "role" so it is preserved beautifully.
+  2. Extract ALL programming languages, tools, frameworks, and technical stack into the "skills" string as a comma-separated list.
+  3. Ensure all personal information and summaries are fully captured.
+
   Extract the following JSON structure from the provided text:
   {
     "personalInfo": { "name": "", "email": "", "phone": "", "linkedin": "", "github": "", "x": "", "reddit": "", "leetcode": "", "portfolio": "" },

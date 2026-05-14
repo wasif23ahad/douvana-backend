@@ -43,7 +43,10 @@ export async function callAI(params: {
         ? `SYSTEM: ${params.system}\n\n${params.messages.map(m => `${m.role.toUpperCase()}: ${m.content}`).join('\n')}`
         : params.messages.map(m => `${m.role.toUpperCase()}: ${m.content}`).join('\n');
 
-      const result = await geminiModel.generateContent(prompt);
+      const result = await geminiModel.generateContent({
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        generationConfig: params.jsonMode ? { responseMimeType: "application/json" } : undefined,
+      });
       const text = result.response.text();
       
       return params.jsonMode ? text.replace(/```json|```/g, '').trim() : text;
