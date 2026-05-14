@@ -123,9 +123,13 @@ export async function callAI(params: {
 
       if (sys.includes('AI resume parser') || sys.includes('RESUME_PARSER')) {
         return JSON.stringify({
-          personalInfo: { name: "Professional Candidate", email: "candidate@drouvana.io", phone: "+1 (555) 019-2834", linkedin: "linkedin.com/in/candidate" },
+          personalInfo: { name: "Professional Candidate", title: "Software Engineer", email: "candidate@drouvana.io", phone: "+1 (555) 019-2834", linkedin: "linkedin.com/in/candidate", github: "", portfolio: "", x: "", reddit: "", leetcode: "", location: "" },
           summary: "Experienced full-stack developer with focused expertise in scaling web application backends and optimizing database architectures.",
-          experience: [{ id: "1", company: "Tech Solutions Inc", role: "Software Engineer", dates: "2022 - Present", description: "Developed scalable RESTful APIs and modern frontend interfaces." }],
+          experience: [{ id: "1", company: "Tech Solutions Inc", role: "Software Engineer", location: "", startDate: "01-2022", endDate: "Present", description: "Developed scalable RESTful APIs and modern frontend interfaces." }],
+          education: [{ id: "1", institution: "State University", degree: "B.S.", field: "Computer Science", startDate: "09-2018", endDate: "05-2022", gpa: "" }],
+          projects: [{ id: "1", name: "", description: "", techStack: "", url: "", startDate: "", endDate: "" }],
+          certifications: [{ id: "1", name: "", issuer: "", date: "", url: "" }],
+          training: [],
           skills: "JavaScript, TypeScript, React, Node.js, Express, SQL, Git"
         });
       }

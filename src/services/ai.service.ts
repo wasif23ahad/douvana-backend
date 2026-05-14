@@ -14,24 +14,78 @@ function isOffTopic(message: string): boolean {
   if (!text) return false;
 
   // Always allow obvious in-scope vocabulary — this prevents false positives.
+  // The scope is intentionally broad: anything tech OR anything career.
   const inScopeSignals = [
+    // career / job-search
     'resume', 'cv', 'cover letter', 'interview', 'recruiter', 'hiring', 'hire',
     'job', 'jobs', 'role', 'position', 'application', 'apply', 'applied',
     'career', 'salary', 'compensation', 'offer', 'negotiat', 'linkedin', 'portfolio',
     'referral', 'follow-up', 'follow up', 'rejection', 'onsite', 'screening',
-    'coding', 'algorithm', 'algo', 'dsa', 'data structure', 'system design',
-    'leetcode', 'behavioral', 'star method', 'star answer', 'technical question',
     'mock interview', 'big tech', 'faang', 'recruit', 'company', 'startup',
-    // common tech topics relevant to engineering interviews
-    'javascript', 'typescript', 'python', 'java ', 'kotlin', 'golang', ' go ',
-    'react', 'next.js', 'node', 'express', 'sql', 'postgres', 'mongo', 'redis',
-    'docker', 'kubernetes', 'aws', 'gcp', 'azure', 'graphql', 'rest', 'api',
-    'frontend', 'backend', 'full-stack', 'fullstack', 'devops', 'ml engineer',
-    'ai engineer', 'data engineer', 'data scientist', 'qa engineer', 'sre',
-    'software engineer', 'developer', 'programmer', 'engineering manager',
-    'pm role', 'product manager', 'ux', 'ui ', 'designer role', 'ats',
-    // skill-building / learning is in-scope when career-framed
-    'learn ', 'study plan', 'roadmap', 'prepare', 'preparation', 'skill',
+    'behavioral', 'star method', 'star answer', 'technical question',
+    // problem solving / DSA / competitive programming
+    'coding', 'code', 'codes', 'algorithm', 'algo', 'dsa', 'data structure',
+    'problem solving', 'problem-solving', 'practice problem', 'coding problem',
+    'leetcode', 'neetcode', 'hackerrank', 'codeforces', 'atcoder', 'codechef',
+    'codewars', 'topcoder', 'cses', 'interviewbit', 'algoexpert', 'educative',
+    'grokking', 'bytebytego', 'system design primer', 'cracking the coding',
+    'big o', 'time complexity', 'space complexity', 'dynamic programming',
+    'recursion', 'backtracking', 'greedy', 'sliding window', 'two pointer',
+    'binary search', 'graph', 'tree', 'linked list', 'hash map', 'hashmap',
+    'stack', 'queue', 'heap', 'trie', 'bfs', 'dfs', 'dijkstra', 'topological',
+    // languages
+    'javascript', 'typescript', 'python', 'java ', 'kotlin', 'swift', 'golang',
+    ' go ', 'rust', 'c++', 'c#', 'php', 'ruby', 'scala', 'dart', 'r ', 'matlab',
+    'haskell', 'elixir', 'clojure', 'perl', 'bash', 'shell',
+    // frontend
+    'react', 'next.js', 'nextjs', 'vue', 'svelte', 'angular', 'remix',
+    'tailwind', 'css', 'html', 'sass', 'webpack', 'vite', 'redux', 'zustand',
+    'storybook', 'figma', 'a11y', 'accessibility', 'web vitals',
+    // backend
+    'node', 'express', 'nestjs', 'fastify', 'django', 'fastapi', 'flask',
+    'spring', 'rails', 'laravel', '.net', 'asp.net',
+    // databases
+    'sql', 'postgres', 'postgresql', 'mysql', 'sqlite', 'mariadb',
+    'mongo', 'mongodb', 'redis', 'dynamodb', 'cassandra', 'elasticsearch',
+    'prisma', 'sequelize', 'orm', 'index', 'query',
+    // cloud / devops / infra
+    'docker', 'kubernetes', 'k8s', 'helm', 'terraform', 'ansible',
+    'aws', 'gcp', 'azure', 'lambda', 's3', 'ec2', 'cloudflare', 'vercel',
+    'netlify', 'heroku', 'ci/cd', 'github actions', 'gitlab', 'jenkins',
+    'monitoring', 'observability', 'prometheus', 'grafana', 'sentry',
+    'devops', 'sre', 'platform engineering',
+    // networking / security / OS
+    'http', 'https', 'tcp', 'udp', 'dns', 'tls', 'ssl', 'cors', 'csrf', 'xss',
+    'oauth', 'jwt', 'authentication', 'authorization', 'encryption', 'hashing',
+    'linux', 'unix', 'kernel', 'process', 'thread', 'concurrency', 'mutex',
+    'operating system', 'memory leak',
+    // data / ml / ai
+    'machine learning', 'ml ', 'deep learning', 'neural network', 'llm',
+    'transformer', 'embedding', 'vector db', 'rag', 'fine-tune', 'tensorflow',
+    'pytorch', 'numpy', 'pandas', 'jupyter', 'data engineering', 'etl', 'spark',
+    'kafka', 'airflow', 'snowflake', 'bigquery', 'data warehouse',
+    // architecture / system design
+    'system design', 'microservice', 'monolith', 'event-driven', 'cqrs',
+    'pub/sub', 'pubsub', 'message queue', 'load balancer', 'scalab',
+    'distributed', 'sharding', 'replication', 'consistency', 'cap theorem',
+    'caching', 'cache', 'cdn', 'rate limit', 'throttle',
+    // protocols / formats
+    'graphql', 'rest', 'grpc', 'websocket', 'sse ', 'server-sent', 'json',
+    'yaml', 'protobuf', 'xml',
+    // roles
+    'frontend', 'backend', 'full-stack', 'fullstack', 'mobile dev', 'android dev',
+    'ios dev', 'ml engineer', 'ai engineer', 'data engineer', 'data scientist',
+    'qa engineer', 'software engineer', 'developer', 'programmer', 'engineer',
+    'engineering manager', 'tech lead', 'principal engineer', 'staff engineer',
+    'pm role', 'product manager', 'designer role', 'ux ', 'ui ', 'ats',
+    // generic tech / curiosity prompts
+    'tech', 'technology', 'programming', 'software', 'web dev', 'app dev',
+    'debug', 'debugging', 'refactor', 'unit test', 'integration test',
+    'pull request', 'pr review', 'code review', 'git ',
+    'how does', 'what is the difference', 'explain', 'best practice',
+    // skill-building / learning
+    'learn ', 'learning path', 'study plan', 'roadmap', 'prepare', 'preparation',
+    'skill', 'tutorial', 'course',
   ];
   if (inScopeSignals.some(s => text.includes(s))) return false;
 
@@ -72,11 +126,12 @@ function isOffTopic(message: string): boolean {
 
 function buildScopeRefusal(): string {
   return (
-    "That's outside what I'm built for — I'm your **Drouvana Career Coach**, focused on interview prep, resume work, technical interview questions, and job-search strategy.\n\n" +
+    "That's outside what I'm built for — I'm your **Drouvana Career Coach**, focused on **tech topics** and **career growth**.\n\n" +
     "Here are a few things I can help you with instead:\n" +
-    "- Practice a behavioral or technical interview question\n" +
-    "- Review or rewrite a resume bullet or summary\n" +
-    "- Plan a study roadmap for your target role (DSA, system design, frameworks)\n" +
+    "- Answer a tech question (languages, frameworks, system design, databases, DevOps, AI/ML)\n" +
+    "- Walk through a coding problem and recommend where to practice (LeetCode, NeetCode, Codeforces, etc.)\n" +
+    "- Review or rewrite a resume bullet, summary, or cover letter\n" +
+    "- Plan a study roadmap for your target role (DSA, system design, a new stack)\n" +
     "- Draft a recruiter outreach or follow-up message\n" +
     "- Strategize your job search or salary negotiation\n\n" +
     "What would you like to work on?"

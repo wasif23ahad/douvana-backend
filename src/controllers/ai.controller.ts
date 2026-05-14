@@ -158,6 +158,16 @@ export const chatSSE = async (req: Request, res: Response, next: NextFunction) =
       prisma.masterResume.findUnique({ where: { userId } })
     ]);
 
+    // Normalize skills: master resume stores it as either a comma-separated string
+    // (from the resume parser) or an array (from seed/manual edits). Downstream
+    // prompts must not assume one shape.
+    const rawSkills = (masterResume?.data as any)?.skills;
+    const skillsList: string[] = Array.isArray(rawSkills)
+      ? rawSkills.map((s: any) => String(s).trim()).filter(Boolean)
+      : typeof rawSkills === 'string'
+        ? rawSkills.split(/[,;\n]/).map((s: string) => s.trim()).filter(Boolean)
+        : [];
+
     const serverContext = {
       totalApplications: totalApps,
       statusBreakdown: stats.reduce((acc: any, s: any) => ({ ...acc, [s.status]: s._count }), {}),
@@ -167,7 +177,7 @@ export const chatSSE = async (req: Request, res: Response, next: NextFunction) =
       responseRate: totalApps > 0
         ? Math.round((stats.filter((s: any) => ['INTERVIEW', 'OFFER'].includes(s.status)).reduce((a: any, s: any) => a + s._count, 0) / totalApps) * 100)
         : 0,
-      skills: (masterResume?.data as any)?.skills || [],
+      skills: skillsList,
       experienceLevel: 'Mid-level',
       recentApplications: recentApps.map((a: any) => ({ jobTitle: a.jobTitle, companyName: a.company, status: a.status }))
     };
@@ -305,8 +315,10 @@ export const parseResumePDF = async (req: Request, res: Response, next: NextFunc
       parsedResume = {
         personalInfo: {
           name: candidateName,
+          title: "",
           email: candidateEmail,
           phone: candidatePhone,
+          location: "",
           linkedin: candidateLinkedin,
           github: candidateGithub,
           portfolio: "",
@@ -320,10 +332,16 @@ export const parseResumePDF = async (req: Request, res: Response, next: NextFunc
             id: "exp_extracted_real",
             company: "",
             role: "",
-            dates: "",
+            location: "",
+            startDate: "",
+            endDate: "",
             description: expSectionExcerpt.length > 15 ? expSectionExcerpt : ""
           }
         ],
+        education: [],
+        projects: [],
+        certifications: [],
+        training: [],
         skills: candidateSkills
       };
     } else if (!parsedResume || !parsedResume.personalInfo || !parsedResume.personalInfo.name) {
@@ -331,8 +349,10 @@ export const parseResumePDF = async (req: Request, res: Response, next: NextFunc
       parsedResume = {
         personalInfo: {
           name: (req.user as any)?.name || "",
+          title: "",
           email: req.user?.email || "",
           phone: "",
+          location: "",
           linkedin: "",
           github: "",
           portfolio: ""
@@ -343,10 +363,16 @@ export const parseResumePDF = async (req: Request, res: Response, next: NextFunc
             id: "exp_1",
             company: "",
             role: "",
-            dates: "",
+            location: "",
+            startDate: "",
+            endDate: "",
             description: ""
           }
         ],
+        education: [],
+        projects: [],
+        certifications: [],
+        training: [],
         skills: ""
       };
     }
