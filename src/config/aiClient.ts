@@ -3,14 +3,14 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { env } from './env';
 import logger from '../lib/logger';
 
-// NVIDIA NIM (OpenAI Compatible)
+// NVIDIA NIM (OpenAI Compatible) — trim key to guard against accidental whitespace in .env
 export const nvidiaNim = new OpenAI({
-  apiKey: env.NVIDIA_NIM_API_KEY,
+  apiKey: (env.NVIDIA_NIM_API_KEY || '').trim(),
   baseURL: 'https://integrate.api.nvidia.com/v1',
 });
 
 // Google Gemini
-const genAI = new GoogleGenerativeAI(env.GEMINI_API_KEY);
+const genAI = new GoogleGenerativeAI((env.GEMINI_API_KEY || '').trim());
 export const geminiModel = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
 /**

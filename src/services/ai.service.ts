@@ -43,7 +43,8 @@ export class AIService {
   }
 
   /**
-   * Agent 2: ATS Analyzer (Streaming)
+   * Agent 2: ATS Analyzer
+   * Uses non-streaming callAI with jsonMode to guarantee clean JSON output.
    */
   async analyzeResumeSSE(resumeData: any, jobDescription: string, res: Response, userId: string) {
     const startTime = Date.now();
@@ -51,24 +52,38 @@ export class AIService {
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
 
+    const send = (type: string, payload: object) =>
+      res.write(`data: ${JSON.stringify({ type, ...payload })}\n\n`);
+
     try {
+      send('progress', { step: 1, message: 'Analyzing resume against job description...' });
+
       const prompt = (resumeData as any)?.rawText
         ? buildATSAnalyzerPromptFromText((resumeData as any).rawText, jobDescription)
         : buildATSAnalyzerPrompt(resumeData, jobDescription);
-      const stream = await streamAI({
+
+      send('progress', { step: 2, message: 'Running ATS compatibility check...' });
+
+      const raw = await callAI({
         system: prompts.ATS_ANALYZER_SYSTEM,
         messages: [{ role: 'user', content: prompt }],
         temperature: 0.3,
+        max_tokens: 3000,
+        jsonMode: true,
       });
 
-      let fullContent = '';
-      for await (const chunk of stream) {
-        const content = chunk.choices[0]?.delta?.content || '';
-        fullContent += content;
-        res.write(`data: ${JSON.stringify({ type: 'delta', content })}\n\n`);
-      }
+      if (!raw) throw new Error('AI returned empty response');
 
-      res.write(`data: ${JSON.stringify({ type: 'complete', fullContent })}\n\n`);
+      // Strip markdown code fences if present (some models wrap JSON in ```json ... ```)
+      const cleaned = raw.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+
+      // Extract the JSON object in case there's any leading/trailing prose
+      const match = cleaned.match(/\{[\s\S]*\}/);
+      if (!match) throw new Error('AI response did not contain valid JSON');
+
+      const result = JSON.parse(match[0]);
+
+      send('complete', { result });
       res.end();
 
       await this.logAIUsage({
@@ -79,8 +94,16 @@ export class AIService {
       });
     } catch (error: any) {
       logger.error('ATS Analyzer Agent Error:', error.message);
-      res.write(`data: ${JSON.stringify({ type: 'error', message: error.message })}\n\n`);
+      send('error', { message: 'Analysis failed: ' + (error.message || 'Unknown error') });
       res.end();
+
+      await this.logAIUsage({
+        userId,
+        feature: 'ATS_ANALYZER',
+        latencyMs: Date.now() - startTime,
+        success: false,
+        errorMsg: error.message,
+      });
     }
   }
 

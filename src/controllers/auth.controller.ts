@@ -167,6 +167,30 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
   }
 };
 
+export const refreshToken = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { refreshToken: token } = req.body;
+    if (!token) return res.status(400).json({ message: 'Refresh token required' });
+
+    const decoded: any = jwt.verify(token, process.env.JWT_REFRESH_SECRET!);
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.id },
+      select: { id: true, email: true, name: true, role: true, avatar: true, isActive: true },
+    });
+
+    if (!user || !user.isActive) {
+      return res.status(401).json({ message: 'User not found or inactive' });
+    }
+
+    res.json({
+      token: generateToken(user.id),
+      refreshToken: generateRefreshToken(user.id),
+    });
+  } catch (error) {
+    return res.status(401).json({ message: 'Invalid or expired refresh token' });
+  }
+};
+
 export const getMe = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const user = await prisma.user.findUnique({
